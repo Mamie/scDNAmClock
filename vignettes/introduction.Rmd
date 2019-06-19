@@ -1,0 +1,27 @@
+---
+title: "Introduction to scDNAmClock"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to scDNAmClock}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(scDNAmClock)
+library(GEOquery)
+```
+
+Download processed datasets
+
+```{r}
+gse <- getGEO("GSE112471", filename = "/gpfs/ysm/project/mw957/data/public/snmC-seq2", 
+              GSEMatrix = T)
+```
