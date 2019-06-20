@@ -1,24 +1,18 @@
-# setMethod("coverage_plot",
-#           signature = "SimpleList",
-#           function(object) {
-#             for (i in seq_along(object)) {
-#               
-#             }
-#           })
-
 #' @import ggplot2 
-.coverage_plot <- function(methCall_obj, id) {
-  ggplot(data = data.frame(coverage = methCall_obj$met_reads + methCall_obj$unmet_reads)) +
-    geom_histogram(aes(x = coverage), bins = 10, fill = "steelblue") +
-    ggtitle(id) +
-    theme_classic() +
-    scale_x_log10() +
-    scale_y_continuous(labels = fancy_scientific)
-}
+setMethod("plot",
+           signature = signature("methCall", "character"),
+           function(x, y) {
+            ggplot(data = data.frame(coverage = x@data$met_reads + x@data$unmet_reads)) +
+              geom_histogram(aes(x = coverage), bins = 10, fill = "steelblue") +
+              ggtitle(y) +
+              theme_classic() +
+              scale_x_log10() +
+              scale_y_continuous(labels = fancy_scientific) +
+              theme(plot.title = element_text(hjust = 0.5))
+          })
 
 # from https://groups.google.com/forum/#!topic/ggplot2/a_xhMoQyxZ4
 fancy_scientific <- function(l) { 
-  browser()
   l <- format(l, scientific = TRUE) 
   l <- gsub("e+00", "", l, fixed = T)
   l <- gsub("+", "", l, fixed = T)

@@ -11,5 +11,7 @@ test <- read_meth(cov_files[1:2],
           strand_idx = NULL,
           id = id[1:2]) # 129.4 vs 51.6 vs 49.2
 
-.coverage_plot(test[[1]]@data, names(test)[1])
-test <- merge_meth()
+plot(test[[1]], names(test)[1])
+plot(test[[2]], names(test)[2])
+
+inner_joined_test <- inner_join_meth()

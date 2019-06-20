@@ -7,11 +7,12 @@
 #' @param unmet_idx The index of column for the number of unmethylated reads
 #' @param strand_idx The index of column containing strand if available
 #' @param id The id to each file
+#' @param deduplicate Whether to sum the reads for rows with the same genomic location
 #' @importFrom S4Vectors Rle DataFrame SimpleList
 #' @import dplyr
 #' @export
 read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = NULL,
-                      id) {
+                      id, deduplicate = T) {
   browser()
   meth_list <- SimpleList()
   
@@ -24,7 +25,8 @@ read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = 
       strand <- rep("*", nrow(data))
     }
     
-    data <- data.frame(chr = data[, chr_idx],
+    if (deduplicate)
+      data <- data.frame(chr = data[, chr_idx],
                        position = data[, pos_idx],
                        strand = strand,
                        met_reads = data[, met_idx],
