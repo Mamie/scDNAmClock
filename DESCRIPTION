@@ -11,6 +11,12 @@ Description: Application of epigenetic clock on single-celll methylation dataset
 License: MIT + LICENSE
 Encoding: UTF-8
 LazyData: true
+Imports:
+    dplyr,
+    data.table,
+    S4Vectors,
+    scales,
+    ggplot2
 Suggests: 
     knitr,
     rmarkdown
