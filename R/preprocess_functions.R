@@ -17,7 +17,7 @@ read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = 
   
   p <- dplyr::progress_estimated(length(files))
   for (i in seq_along(files)) {
-    data <- data.table::fread(files[i], sep = "\t", header = F, stringsAsFactors = F)
+    data <- read.delim(files[i], sep = "\t", header = F, stringsAsFactors = F)
     if (!is.null(strand_idx)) {
       strand <- data[, strand_idx]
     } else {

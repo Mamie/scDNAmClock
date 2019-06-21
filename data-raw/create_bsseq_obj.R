@@ -12,18 +12,19 @@
 #' transcriptional states, whereas 2i ESC will be uncoupled in transcription and
 #' DNA methylation. 
 
-in_dir <- "~/Downloads/GSE68642_coverage"
+in_dir <- "/gpfs/ysm/project/mw957/data/public/scMT-seq"
 cov_files <- list.files(in_dir, pattern = "cov.gz", full.names = T)
-id <- purrr::map_chr(cov_files, ~strsplit(.x, split = "[/.]")[[1]][6])
+id <- purrr::map_chr(cov_files, ~strsplit(.x, split = "[/.]")[[1]][9])
 
 data <- read_meth(
-  files = cov_files[1:3],
+  files = cov_files,
   chr_idx = 1,
   pos_idx = 2,
   met_idx = 5, 
   unmet_idx = 6,
   strand_idx = NULL,
-  id = id[1:3])
+  id = id,
+  deduplicate = T)
 
 p_list <- plot_coverage(data)
 p <- cowplot::plot_grid(plotlist = p_list, nrow = 1, align = "v")

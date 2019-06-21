@@ -13,10 +13,10 @@ Encoding: UTF-8
 LazyData: true
 Imports:
     dplyr,
-    data.table,
     S4Vectors,
     scales,
-    ggplot2
+    ggplot2, 
+    SparkR
 Suggests: 
     knitr,
     rmarkdown
