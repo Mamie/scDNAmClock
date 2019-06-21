@@ -11,6 +11,20 @@ setMethod("plot",
               theme(plot.title = element_text(hjust = 0.5))
           })
 
+#' Plot coverage distribution for a list of methCall objects
+#' @param meth_list A list of methCall objects
+#' @return A list of ggplot objects
+#' @export
+plot_coverage <- function(meth_list) {
+  titles <- names(meth_list)
+  p_list <- list()
+  for (i in seq_along(meth_list)) {
+    p <- plot(meth_list[[i]], titles[i])
+    p_list[[titles[i]]] <- p
+  }
+  return(p_list)
+}
+
 # from https://groups.google.com/forum/#!topic/ggplot2/a_xhMoQyxZ4
 fancy_scientific <- function(l) { 
   l <- format(l, scientific = TRUE) 

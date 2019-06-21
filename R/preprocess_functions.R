@@ -13,7 +13,6 @@
 #' @export
 read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = NULL,
                       id, deduplicate = T) {
-  browser()
   meth_list <- SimpleList()
   
   p <- dplyr::progress_estimated(length(files))
@@ -49,4 +48,24 @@ read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = 
   }
   
   return(meth_list)
+}
+
+#' Join a list of methCall object by site
+#' 
+#' @param meth_list A named list of methCall object (from read_meth)
+#' @param all.x Whether to include all rows in x
+#' @param all.y Whether to include all rows in y
+#' @return A DataFrame that is a inner join of all the methCall
+#' @export
+join_meth_list <- function(meth_list, all.x = FALSE, all.y = FALSE) {
+  browser()
+  joined <- x[[1]]@data
+  colnames(joined)[4:5] <- paste0(colnames(joined)[4:5], ".", names(x)[1])
+  for (i in seq_along(x)[-1]) {
+    df <- x[[i]]@data
+    colnames(df)[4:5] <- paste0(colnames(df)[4:5], ".", names(x)[i])
+    joined <- SparkR::merge(joined, df, by = c("chr", "position", "strand"),
+                            all.x = FALSE, all.y = FALSE)
+  }
+  return(joined)
 }
