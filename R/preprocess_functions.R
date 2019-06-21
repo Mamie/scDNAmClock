@@ -58,11 +58,11 @@ read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = 
 #' @return A DataFrame that is a inner join of all the methCall
 #' @export
 join_meth_list <- function(meth_list, all.x = FALSE, all.y = FALSE) {
-  joined <- x[[1]]@data
-  colnames(joined)[4:5] <- paste0(colnames(joined)[4:5], ".", names(x)[1])
-  for (i in seq_along(x)[-1]) {
-    df <- x[[i]]@data
-    colnames(df)[4:5] <- paste0(colnames(df)[4:5], ".", names(x)[i])
+  joined <- meth_list[[1]]@data
+  colnames(joined)[4:5] <- paste0(colnames(joined)[4:5], ".", names(meth_list)[1])
+  for (i in seq_along(meth_list)[-1]) {
+    df <- meth_list[[i]]@data
+    colnames(df)[4:5] <- paste0(colnames(df)[4:5], ".", names(meth_list)[i])
     joined <- SparkR::merge(joined, df, by = c("chr", "position", "strand"),
                             all.x = FALSE, all.y = FALSE)
   }
