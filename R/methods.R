@@ -1,3 +1,15 @@
+setMethod("nrow",
+          signature = signature("methCall"),
+          function(x) {
+            return(nrow(x@data))
+          })
+
+setMethod("filter",
+          signature = signature("methCall", "function"),
+          function(.data, .preserve) {
+            return(new("methCall", data = .data@data[.preserve(x),]))
+          })
+
 #' @import ggplot2 
 setMethod("plot",
            signature = signature("methCall", "character"),
