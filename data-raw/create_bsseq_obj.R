@@ -11,6 +11,8 @@
 #' that in serum, ESCs will be metastable and heterogenous, switching between  
 #' transcriptional states, whereas 2i ESC will have hypomethylation. 
 
+library(scDNAmClock)
+
 in_dir <- "/gpfs/ysm/project/mw957/data/public/scMT-seq"
 cov_files <- list.files(in_dir, pattern = "cov.gz", full.names = T)
 id <- purrr::map_chr(cov_files, ~strsplit(.x, split = "[/.]")[[1]][9])
@@ -30,7 +32,7 @@ data <- readRDS("/gpfs/ysm/project/mw957/data/processed/Angermueller2016/dedupli
 
 # summary statistics on the data
 
-# sites covered
+# plot sites covered
 sites_covered <- purrr::map_int(data@listData, nrow)
 p <- ggplot(data = data.frame(n_sites = sites_covered, 
                               type = purrr::map_chr(names(data), ~strsplit(.x, split = "_")[[1]][1]))) +
@@ -117,9 +119,11 @@ paste0("chr", clock_info$CHR, ":", clock_info$MAPINFO)
 # each cell
 task_list <- data.frame(
   region = c("chr13:12520677-12522012",
-             "chr13:41220278-41220833"),
+             "chr13:41220278-41220833",
+             "chr13:12519445-12520370"),
   id = c("EDARADD", 
-         "ELOVL2"),
+         "ELOVL2",
+         "EDARADD_CGI"),
   stringsAsFactors = F)
 task_list$chr <- strsplit(task_list$region, split = "chr|:")[[1]][2]
 task_list$start <- purrr::map_chr(task_list$region, ~strsplit(.x, split = ":|-")[[1]][2])

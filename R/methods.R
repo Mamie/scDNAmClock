@@ -1,13 +1,31 @@
-setMethod("nrow",
+#' Number of rows
+#' 
+#' @param x A methCall object
+#' @rdname n_row-methods
+#' @export
+setGeneric("n_row", function(x) standardGeneric("n_row"))
+
+#' @rdname n_row-methods
+setMethod("n_row",
           signature = signature("methCall"),
           function(x) {
             return(nrow(x@data))
           })
 
-setMethod("filter",
+#' Filter sites
+#' 
+#' @param x A methCall object
+#' @param f A predicate function that return a logical vector for whether to keep 
+#' the sites
+#' @rdname filter_sites-methods
+#' @export
+setGeneric("filter_sites", function(x, f) standardGeneric("filter_sites"))
+
+#' @rdname filter_sites-methods
+setMethod("filter_sites",
           signature = signature("methCall", "function"),
-          function(.data, .preserve) {
-            return(new("methCall", data = .data@data[.preserve(x),]))
+          function(x, f) {
+            return(new("methCall", data = x@data[f(x),]))
           })
 
 #' @import ggplot2 
