@@ -98,39 +98,146 @@ ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/scMethylseq/figs/ove
 # https://support.illumina.com/content/dam/illumina-marketing/documents/products/technotes/technote_cpg_loci_identification.pdf
 clock_info <- readr::read_csv("/gpfs/ysm/project/mw957/data/public/450K_manifest/HumanMethylation450_15017482_v1-2.csv",
                 skip = 7) %>%
-  filter(IlmnID %in% c("cg09809672", "cg16867657"))
-readr::write_csv(clock_info, "/gpfs/ysm/project/mw957/data/public/450K_manifest/EDARADD_ELOVL2.csv")
+  filter(IlmnID %in% c("cg09809672", 
+                       "cg16867657", 
+                       "cg02228185",
+                       "cg25809905",
+                       "cg17861230"))
+readr::write_csv(clock_info, "/gpfs/ysm/project/mw957/data/public/450K_manifest/probes_of_interest.csv")
 
-clock_info <- readr::read_csv("data-raw/EDARADD_ELOVL2.csv")
+clock_info %>% select(IlmnID, CHR, MAPINFO, UCSC_RefGene_Name) %>%
+  mutate(UCSC_RefGene_Name = purrr::map_chr(UCSC_RefGene_Name, ~strsplit(.x, split = ";")[[1]][1])) %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling()
 
 # the genomic coordinate is human genome build37/hg19, 
 # the genome build in the scM&T-seq paper is GRCm38/mm10,
 # lifting the human genome to mouse genome 
 # http://genome.ucsc.edu/cgi-bin/hgLiftOver
-clock_info$UCSC_CpG_Islands_Name
-#  "chr1:236558459-236559336" "chr6:11043913-11045206"
-#  "chr13:12519445-12520370" "chr13:41220215-41220833"
-paste0("chr", clock_info$CHR, ":", clock_info$MAPINFO)
-# expand for 500 bp up and downstream
-# "chr1:236557682" "chr6:11044877" => "chr1:236557182-236558182" "chr6:11044377-11045377" 
-# "chr13:12520677-12522012" "chr13:41220278-41220833"
+clock_info <- readr::read_csv("/gpfs/ysm/project/mw957/data/public/450K_manifest/probes_of_interest.csv")
+regions <- paste0("chr", clock_info$CHR, ":", clock_info$MAPINFO - 500,
+                 "-", clock_info$MAPINFO + 500)
+
+info <- data.frame(
+  gene = purrr::map_chr(clock_info$UCSC_RefGene_Name, ~strsplit(.x, split = ";")[[1]][1]),
+  CGI = clock_info$UCSC_CpG_Islands_Name,
+  region = regions,
+  stringsAsFactors = F)
+
+info$CGI_mm10 <- c("chr13:12519445-12520370",
+                   "chr13:41220215-41220833",
+                   NA,
+                   NA,
+                   "chr8:70730146-70730302")
+info$region_mm10 <- c("chr13:12520677-12522012",
+                      "chr13:41220278-41220833",
+                      "chr11:73323854-73324841",
+                      "chr11:102470087-102471373",
+                      "chr8:70730146-70730302")
+task_list <- info %>%
+  select(gene, CGI_mm10, region_mm10) %>%
+  tidyr::gather(type, region, -gene) %>%
+  tidyr::drop_na() %>%
+  tidyr::unite(id, gene, type)
 
 # now subset for cells within these regions, and see the numbers of hits within
 # each cell
-task_list <- data.frame(
-  region = c("chr13:12520677-12522012",
-             "chr13:41220278-41220833",
-             "chr13:12519445-12520370"),
-  id = c("EDARADD", 
-         "ELOVL2",
-         "EDARADD_CGI"),
-  stringsAsFactors = F)
-task_list$chr <- strsplit(task_list$region, split = "chr|:")[[1]][2]
+task_list$chr <- purrr::map_chr(task_list$region, ~strsplit(.x, split = "chr|:")[[1]][2])
 task_list$start <- purrr::map_chr(task_list$region, ~strsplit(.x, split = ":|-")[[1]][2])
 task_list$end <- purrr::map_chr(task_list$region, ~strsplit(.x, split = ":|-")[[1]][3])
-
 readr::write_csv(task_list, 
-                 path = "/gpfs/ysm/project/mw957/data/public/450K_manifest/EDARADD_ELOVL2_mm10.csv")
+                 path = "/gpfs/ysm/project/mw957/data/public/450K_manifest/probe_of_interest_mm10.csv")
+
+library(Sushi)
+
+info <- task_list %>%
+  dplyr::select(chr, start, end, id) %>%
+  mutate(avail = c(63, 62, 37, 61),
+         type = c(1, 1, 2, 2))
+
+chrom = "13"
+chromstart = 12519445
+chromend = 12522012
+plotBed(beddata = info[c(1,3),], chrom = chrom, chromstart = chromstart,
+        chromend = chromend, colorby = info$type[c(1,3)], 
+        colorbycol = viridis::viridis, splitstrand=TRUE)
+labelgenome(chrom,chromstart,chromend,n=2,scale="Kb")
+legend("topright", legend=c("CGI","500 bp"),fill=viridis::viridis(2),
+       border=viridis::viridis(2), text.font=2,cex=0.6)
+
+to_df <- function(methCall_obj, name) {
+  if(n_row(methCall_obj) == 0) return()
+  df <- data.frame(
+    chr = as.character(methCall_obj@data$chr),
+    start = methCall_obj@data$position,
+    end = methCall_obj@data$position,
+    methylated = methCall_obj@data$unmet_reads < methCall_obj@data$met_reads,
+    name = name,
+    stringsAsFactors = F
+  )
+  df
+}
+
+task_list$avail <- c(63, 62, 42, 37, 61, 24, 45, 42)
+task_list %>%
+  select(-region) %>%
+  arrange(desc(avail)) %>%
+  kableExtra::kable() %>%
+  kableExtra::kable_styling()
+
+for (i in seq_along(task_list$id)) {
+  object <- readRDS(paste0("data-raw/", task_list$id[i], ".rds"))
+  object <- purrr::imap(object, to_df)
+  object <- dplyr::bind_rows(object)
+  p <- ggplot(data = object) +
+    geom_histogram(aes(x = start, fill = methylated), bins = 100) +
+    theme_classic() +
+    theme(legend.position = c(0.8, 0.8)) +
+    xlab(paste0("chr", task_list$chr[i]))
+  ggsave(p, filename = paste0("~/Dropbox/600 Presentations/Yale projects/scMethylseq/figs/", task_list$id[i], ".png"), width = 5, height = 3)
+}
+
+chrom = "13"
+chromstart = 41220215
+chromend = 41220833
+plotBed(beddata = info[c(2,4),], chrom = chrom, chromstart = chromstart,
+        chromend = chromend)
+labelgenome(chrom,chromstart,chromend,n=2,scale="Kb")
+
+# find the number of cells having overlapping marker
 
 
-class(as.data.frame(data@listData[1]))
+# are cells with no-methylation at certain sites 
+data <- data.frame()
+for (i in seq(4, 8)) {
+  object <- readRDS(paste0("data-raw/", task_list$id[i], ".rds"))
+  object <- purrr::imap(object, to_df)
+  object <- dplyr::bind_rows(object)
+  object$gene <- strsplit(task_list$id[i], split = "_")[[1]][1]
+  data <- dplyr::bind_rows(data, object)
+}
+
+# Let's bin each region into 100 bins as the result of ggplot
+data %<>% group_by(gene, name) %>%
+  summarize(mean_methyl = mean(methylated)) 
+data$condition <- purrr::map_chr(data$name, ~strsplit(.x, split = "_")[[1]][1])
+data_wide <- data %>%
+  tidyr::spread(gene, mean_methyl)
+
+corrplot::corrplot(cor(as.matrix(data_wide[,-1]), use = "pairwise.complete.obs"),
+                   type = "lower", diag = F, order = "hclust")
+
+p <- ggplot(data = data) +
+  geom_histogram(aes(x = mean_methyl, fill = condition), bins = 10) +
+  facet_wrap(~gene, scale = "free", ncol = 5) +
+  theme_classic() +
+  theme(legend.position = c(0.95, 0.8),
+        strip.background = element_blank()) +
+  xlab("mean methylation")
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/scMethylseq/figs/mean_methylation.png", width = 10, height = 2.5)
+
+p <- GGally::ggpairs(data_wide, mapping = aes(color = condition, alpha = 0.6), columns = 2:7) + 
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank())
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/scMethylseq/figs/correlation.png", width = 12, height = 6)

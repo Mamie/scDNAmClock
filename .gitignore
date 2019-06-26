@@ -6,7 +6,7 @@
 .RData
 
 # R Data file
-.rds
+*.rds
 
 # Example code in package build process
 *-Ex.R
@@ -39,3 +39,6 @@ vignettes/*.pdf
 rsconnect/
 .Rproj.user
 inst/doc
+
+# csv files
+*.csv
