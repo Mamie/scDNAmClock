@@ -5,7 +5,7 @@
 \title{Extract the relevant columns from the files}
 \usage{
 read_meth(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = NULL,
-  id, deduplicate = T)
+  coverage_idx = NULL, id, deduplicate = T, header = T)
 }
 \arguments{
 \item{files}{The path to tsv files for methylation status}
@@ -18,11 +18,15 @@ read_meth(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = NULL,
 
 \item{unmet_idx}{The index of column for the number of unmethylated reads}
 
-\item{strand_idx}{The index of column containing strand if available}
+\item{strand_idx}{The index of column containing strand; optional}
+
+\item{coverage_idx}{The index of column containing coverage; optional}
 
 \item{id}{The id to each file}
 
 \item{deduplicate}{Whether to sum the reads for rows with the same genomic location}
+
+\item{header}{Whether to there is a header}
 }
 \description{
 Extract the relevant columns from the files

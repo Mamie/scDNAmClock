@@ -40,5 +40,6 @@ rsconnect/
 .Rproj.user
 inst/doc
 
-# csv files
+# data files
 *.csv
+*.gz

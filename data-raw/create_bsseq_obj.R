@@ -241,3 +241,16 @@ p <- GGally::ggpairs(data_wide, mapping = aes(color = condition, alpha = 0.6), c
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank())
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/scMethylseq/figs/correlation.png", width = 12, height = 6)
+
+# add the sample size for each 
+data_wide %>%
+  select(PDE4C, ITGA2B) %>%
+  tidyr::drop_na()
+
+test <- t(read.delim("~/Downloads/raw.txt", header = F))[-1, c(1,2,4,5,3,6)]
+colnames(test) <- c("id", "name", "age", "sex", "cell_type", "source")
+test <- as.data.frame(test)
+test[, "age"] <- purrr::map_int(test[, "age"], ~as.integer(gsub("age: ", "", .x)))
+test[, "sex"] <- purrr::map_chr(test[, "sex"], ~gsub("gender: ", "", .x))
+test[, "cell_type"] <- purrr::map_chr(test[, "cell_type"], ~gsub("cell type: ", "", .x))
+readr::write_csv(test, path = '~/Downloads/sampl2_info.csv')
