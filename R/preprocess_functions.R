@@ -4,22 +4,23 @@
 #' @param chr_idx The index of column for chromosome
 #' @param pos_idx The index of column for position
 #' @param met_idx The index of column for the number of methylated reads
+#' @param id The id to each file
+#' @param coverage_idx The index of column containing coverage; optional 
 #' @param unmet_idx The index of column for the number of unmethylated reads
 #' @param strand_idx The index of column containing strand; optional 
-#' @param coverage_idx The index of column containing coverage; optional 
-#' @param id The id to each file
 #' @param deduplicate Whether to sum the reads for rows with the same genomic location
 #' @param header Whether to there is a header
+#' @param sep delimiter for methylation status file
 #' @importFrom S4Vectors Rle DataFrame SimpleList
 #' @import dplyr
 #' @export
-read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx = NULL, strand_idx = NULL,
-                      coverage_idx = NULL, id, deduplicate = T, header = T) {
+read_meth <- function(files, chr_idx, pos_idx, met_idx, id, coverage_idx = NULL, strand_idx = NULL,
+                      unmet_idx = NULL, deduplicate = T, header = T, sep = '\t') {
   meth_list <- SimpleList()
   
   p <- dplyr::progress_estimated(length(files))
   for (i in seq_along(files)) {
-    data <- read.delim(files[i], sep = "\t", header = header, stringsAsFactors = F)
+    data <- read.delim(files[i], sep = sep, header = header, stringsAsFactors = F)
     if (!is.null(strand_idx)) {
       strand <- data[, strand_idx]
     } else {
@@ -27,12 +28,14 @@ read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx = NULL, strand
     }
     
     
-    data <- data.frame(chr = data[, chr_idx],
+    if (!is.null(coverage_idx)) coverage <- data[, coverage_idx]
+    if (!is.null(unmet_idx)) coverage <- data[, met_idx] + data[, unmet_idx]
+    data <- data.frame(chr = gsub("chr", "", data[, chr_idx]),
                       position = data[, pos_idx],
                       strand = strand,
                       met_reads = data[, met_idx],
-                      unmet_reads = data[, unmet_idx],
-                      coverage = data[, coverage_idx])
+                      coverage = coverage)
+
     if (deduplicate)
       data <- data %>%
         group_by(chr, position, strand) %>%
@@ -45,7 +48,6 @@ read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx = NULL, strand
                               position = Rle(position),
                               strand = Rle(strand),
                               met_reads = Rle(met_reads),
-                              unmet_reads = Rle(unmet_reads),
                               coverage = Rle(coverage))))
     
     meth_list[[id[i]]] <- meth
