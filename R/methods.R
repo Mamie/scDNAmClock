@@ -28,6 +28,22 @@ setMethod("filter_sites",
             return(new("methCall", data = x@data[f(x),]))
           })
 
+#' Convert methCall object to data frame
+#' 
+#' @param x A methCall object
+#' @rdname as_df-methods
+#' @export
+setGeneric("as_df", function(x, name) standardGeneric("as_df"))
+
+#' @rdname as_df-methods
+setMethod("as_df",
+          signature = signature("methCall"),
+          function(x) {
+            if(n_row(x) == 0) return()
+            df <- as.data.frame(x@data)
+            return(df)
+          })
+
 #' @import ggplot2 
 setMethod("plot",
            signature = signature("methCall", "character"),
@@ -39,6 +55,27 @@ setMethod("plot",
               scale_x_log10() +
               scale_y_continuous(labels = fancy_scientific) +
               theme(plot.title = element_text(hjust = 0.5))
+          })
+
+#' Convert methCall object to data frame
+#' 
+#' @param x A methCall object
+#' @rdname as_GRanges-methods
+#' @export
+setGeneric("as_GRanges", function(x) standardGeneric("as_GRanges"))
+
+#' @rdname as_GRanges-methods
+setMethod("as_GRanges",
+          signature = signature("methCall"),
+          function(x) {
+            if(n_row(x) == 0) return()
+            else {
+              granges <- GRanges(seqnames = Rle(x@data$chr),
+                                 ranges = IRanges::IRanges(start = x@data$position, 
+                                                           end = x@data$position),
+                                 strand = Rle(x@data$strand))
+              return(granges)
+            }
           })
 
 #' Plot coverage distribution for a list of methCall objects

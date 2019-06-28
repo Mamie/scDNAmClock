@@ -4,8 +4,9 @@
 \alias{read_meth}
 \title{Extract the relevant columns from the files}
 \usage{
-read_meth(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = NULL,
-  coverage_idx = NULL, id, deduplicate = T, header = T)
+read_meth(files, chr_idx, pos_idx, met_idx, unmet_idx = NULL,
+  strand_idx = NULL, coverage_idx = NULL, id, deduplicate = T,
+  header = T)
 }
 \arguments{
 \item{files}{The path to tsv files for methylation status}

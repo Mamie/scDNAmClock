@@ -165,18 +165,6 @@ labelgenome(chrom,chromstart,chromend,n=2,scale="Kb")
 legend("topright", legend=c("CGI","500 bp"),fill=viridis::viridis(2),
        border=viridis::viridis(2), text.font=2,cex=0.6)
 
-to_df <- function(methCall_obj, name) {
-  if(n_row(methCall_obj) == 0) return()
-  df <- data.frame(
-    chr = as.character(methCall_obj@data$chr),
-    start = methCall_obj@data$position,
-    end = methCall_obj@data$position,
-    methylated = methCall_obj@data$unmet_reads < methCall_obj@data$met_reads,
-    name = name,
-    stringsAsFactors = F
-  )
-  df
-}
 
 task_list$avail <- c(63, 62, 42, 37, 61, 24, 45, 42)
 task_list %>%

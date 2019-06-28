@@ -13,7 +13,7 @@
 #' @importFrom S4Vectors Rle DataFrame SimpleList
 #' @import dplyr
 #' @export
-read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx, strand_idx = NULL,
+read_meth <- function(files, chr_idx, pos_idx, met_idx, unmet_idx = NULL, strand_idx = NULL,
                       coverage_idx = NULL, id, deduplicate = T, header = T) {
   meth_list <- SimpleList()
   
