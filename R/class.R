@@ -5,8 +5,8 @@
 setClass("methCall",
          representation(data = "DataFrame"),
          validity = function(object) {
-           if (sum(c("chr", "position", "strand", "met_reads") %in% colnames(object@data)) < 4) {
-             stop("The columns must have chr, position, strand, met_reads.")
+           if (sum(c("chr", "position", "strand", "met_reads", "coverage") %in% colnames(object@data)) < 4) {
+             stop("The columns must have chr, position, strand, met_reads, coverage.")
            } else {
              return(TRUE)
            }

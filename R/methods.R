@@ -70,13 +70,37 @@ setMethod("as_GRanges",
           function(x) {
             if(n_row(x) == 0) return()
             else {
-              granges <- GRanges(seqnames = Rle(x@data$chr),
-                                 ranges = IRanges::IRanges(start = x@data$position, 
-                                                           end = x@data$position),
+              granges <- GenomicRanges::GRanges(seqnames = Rle(x@data$chr),
+                                 ranges = IRanges::IRanges(start = as.integer(x@data$position), 
+                                                           end = as.integer(x@data$position)),
                                  strand = Rle(x@data$strand))
               return(granges)
             }
           })
+
+
+#' Liftover methCall object coordinate
+#' 
+#' @param x A methCall object
+#' @param y The path to the chain file
+#' @rdname map_coord-methods
+#' @export
+setGeneric("map_coord", function(x, y) standardGeneric("map_coord"))
+
+#' @rdname map_coord-methods
+setMethod("map_coord",
+          signature = signature(x = "methCall", 
+                                y = "character"),
+          function(x, y) {
+            grObject <- as_GRanges(x)
+            chainObject <- rtracklayer::import.chain(y)
+            results <- as.data.frame(rtracklayer::liftOver(grObject, chainObject))
+            x@data$chr <- Rle(results$seqnames)
+            x@data$position <- Rle(results$start)
+            x@data$strand <- Rle(results$strand)
+            x
+          })
+
 
 #' Plot coverage distribution for a list of methCall objects
 #' @param meth_list A list of methCall objects
