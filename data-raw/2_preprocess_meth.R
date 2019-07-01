@@ -63,3 +63,25 @@ data <- purrr::map(data, ~map_coord(.x, chain_file = "/gpfs/ysm/project/mw957/da
 
 saveRDS(data, file = "/gpfs/ysm/project/mw957/data/processed/mouse_liver/Cole2017.rds")
 
+# Zhou2016 dataset
+# IGV_Link	Chr	pos	Strand	methylC	totalC	Ratio	dbSNP128	dbSNP128Alleles	Gene	Transcript	Strand	InExon	TssDistance	InCpGIslandEntrez_id	Gene_title
+# =Hyperlink("http://localhost:60151/goto?locus=chr1:3010876","chr1:3010876")	chr13010876	R	0	8	0.000	-	-	-	-	-	0	-0	-	-
+#   =Hyperlink("http://localhost:60151/goto?locus=chr1:3010896","chr1:3010896")	chr13010896	R	16	16	1.000	-	-	-	-	-	0	-0	-	-
+
+zhou <- list.files("/gpfs/ysm/project/mw957/data/public/Zhou2016",
+                   pattern = "txt.gz", full.names = T)
+id <- purrr::map_chr(zhou, ~strsplit(.x, split = "_|/")[[1]][9])
+data <- read_meth(
+  files = zhou,
+  chr_idx = 2,
+  pos_idx = 3,
+  met_idx = 4, 
+  coverage_idx = 5, 
+  id = id,
+  deduplicate = F,
+  header = T
+)
+
+data <- purrr::map(data, ~map_coord(.x, chain_file = "/gpfs/ysm/project/mw957/data/public/liftOver_chain/mm9ToMm10.over.chain"))
+
+saveRDS(data, file = "/gpfs/ysm/project/mw957/data/processed/mouse_liver/Zhou2016.rds")

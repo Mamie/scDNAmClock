@@ -8,7 +8,7 @@ Authors@R:
            email = "mamie.wang@yale.edu",
            comment = c(ORCID = "0000-0002-3453-7805"))
 Description: Application of epigenetic clock on single-celll methylation dataset
-License: MIT + LICENSE
+License: MIT
 Encoding: UTF-8
 LazyData: true
 Imports:

@@ -78,7 +78,6 @@ setMethod("as_GRanges",
             }
           })
 
-
 #' Liftover methCall object coordinate
 #' 
 #' @param x A methCall object
