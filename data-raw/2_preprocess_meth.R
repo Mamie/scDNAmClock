@@ -75,13 +75,13 @@ data <- read_meth(
   files = zhou,
   chr_idx = 2,
   pos_idx = 3,
-  met_idx = 4, 
-  coverage_idx = 5, 
+  met_idx = 5, 
+  coverage_idx = 6, 
   id = id,
   deduplicate = F,
   header = T
 )
 
-data <- purrr::map(data, ~map_coord(.x, chain_file = "/gpfs/ysm/project/mw957/data/public/liftOver_chain/mm9ToMm10.over.chain"))
+data <- purrr::map(data, ~map_coord(.x, "/gpfs/ysm/project/mw957/data/public/liftOver_chain/mm9ToMm10.over.chain"))
 
 saveRDS(data, file = "/gpfs/ysm/project/mw957/data/processed/mouse_liver/Zhou2016.rds")

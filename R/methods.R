@@ -91,15 +91,23 @@ setMethod("map_coord",
           signature = signature(x = "methCall", 
                                 y = "character"),
           function(x, y) {
+            x@data$chr[!grepl("chr", x@data$chr)] <- paste0("chr", x@data$chr[!grepl("chr", x@data$chr)])
             grObject <- as_GRanges(x)
             chainObject <- rtracklayer::import.chain(y)
-            results <- as.data.frame(rtracklayer::liftOver(grObject, chainObject))
-            x@data$chr <- Rle(results$seqnames)
-            x@data$position <- Rle(results$start)
-            x@data$strand <- Rle(results$strand)
-            x
+            for (i in seq(length(grObject))) {
+              results <- as.data.frame(rtracklayer::liftOver(grObject[i], chainObject))
+              if (nrow(results) == 0) {
+                x@data$chr[i] <- NA
+                x@data$position[i] <- NA
+                x@data$strand[i] <- NA
+              } else {
+                x@data$chr[i] <- gsub("chr", "", results$seqnames[1])
+                x@data$position[i] <- results$start[1]
+                x@data$strand[i] <- results$strand[1]
+              }
+            }
+            filter_sites(x, function(x) !is.na(x@data$chr))
           })
-
 
 #' Plot coverage distribution for a list of methCall objects
 #' @param meth_list A list of methCall objects
