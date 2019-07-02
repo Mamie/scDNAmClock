@@ -99,7 +99,7 @@ setMethod("map_coord",
             grObject <- as_GRanges(x)
             chainObject <- rtracklayer::import.chain(y)
             results <- as.data.frame(rtracklayer::liftOver(grObject, chainObject))
-            new("methCall", data = DataFrame(chr = Rle(results$seqnames),
+            new("methCall", data = DataFrame(chr = Rle(gsub("chr", "", results$seqnames)),
                                              position = Rle(results$start),
                                              strand = Rle(results$strand),
                                              met_reads = Rle(results$met_reads),
