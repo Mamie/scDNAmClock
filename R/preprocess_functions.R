@@ -37,9 +37,7 @@ read_meth <- function(files, chr_idx, pos_idx, met_idx, id, coverage_idx = NULL,
                       coverage = coverage)
 
     if (deduplicate)
-      data <- data %>%
-        group_by(chr, position, strand) %>%
-        summarize_all(sum)
+      data <- dplyr::distinct(data)
     
     meth <- new("methCall", 
                 data = with(data, 
