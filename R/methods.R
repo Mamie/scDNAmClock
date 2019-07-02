@@ -73,7 +73,9 @@ setMethod("as_GRanges",
               granges <- GenomicRanges::GRanges(seqnames = Rle(x@data$chr),
                                  ranges = IRanges::IRanges(start = as.integer(x@data$position), 
                                                            end = as.integer(x@data$position)),
-                                 strand = Rle(x@data$strand))
+                                 strand = Rle(x@data$strand),
+                                 met_reads = Rle(x@data$met_reads),
+                                 coverage = Rle(x@data$coverage))
               return(granges)
             }
           })
@@ -91,22 +93,17 @@ setMethod("map_coord",
           signature = signature(x = "methCall", 
                                 y = "character"),
           function(x, y) {
-            x@data$chr[!grepl("chr", x@data$chr)] <- paste0("chr", x@data$chr[!grepl("chr", x@data$chr)])
+            chr_prefix <- as.character(x@data$chr)
+            chr_prefix[!grepl("chr", chr_prefix)] <- paste0("chr", chr_prefix[!grepl("chr", chr_prefix)])
+            x@data$chr <- Rle(chr_prefix)
             grObject <- as_GRanges(x)
             chainObject <- rtracklayer::import.chain(y)
-            for (i in seq(length(grObject))) {
-              results <- as.data.frame(rtracklayer::liftOver(grObject[i], chainObject))
-              if (nrow(results) == 0) {
-                x@data$chr[i] <- NA
-                x@data$position[i] <- NA
-                x@data$strand[i] <- NA
-              } else {
-                x@data$chr[i] <- gsub("chr", "", results$seqnames[1])
-                x@data$position[i] <- results$start[1]
-                x@data$strand[i] <- results$strand[1]
-              }
-            }
-            filter_sites(x, function(x) !is.na(x@data$chr))
+            results <- as.data.frame(rtracklayer::liftOver(grObject, chainObject))
+            new("methCall", data = DataFrame(chr = Rle(results$seqnames),
+                                             position = Rle(results$start),
+                                             strand = Rle(results$strand),
+                                             met_reads = Rle(results$met_reads),
+                                             coverage = Rle(results$coverage)))
           })
 
 #' Plot coverage distribution for a list of methCall objects
