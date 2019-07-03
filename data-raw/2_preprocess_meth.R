@@ -85,3 +85,13 @@ data <- read_meth(
 data <- purrr::map(data, ~map_coord(.x, "/gpfs/ysm/project/mw957/data/public/liftOver_chain/mm9ToMm10.over.chain"))
 
 saveRDS(data, file = "/gpfs/ysm/project/mw957/data/processed/mouse_liver/Zhou2016.rds")
+
+# summary statistics on all datasets
+summary_stats <- data.frame(dataset = c("Zhou2016", "Hahn2017", "Cole2017", "Horvath2018"),
+           type = c("RRBS", "WGBS", "WGBS", "RRBS"),
+           genome_build = c("mm9", "mm10", "mm9", "mm10"),
+           n = c(29, 18, 32, 60),
+           complete_sites = c(9465, 3602999, NA, 1057993))
+
+kableExtra::kable(summary_stats) %>%
+  kableExtra::kable_styling()

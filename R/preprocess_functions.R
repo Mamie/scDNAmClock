@@ -71,7 +71,7 @@ join_meth_list <- function(meth_list, all.x = FALSE, all.y = FALSE) {
     df <- meth_list[[i]]@data
     colnames(df)[4:5] <- paste0(colnames(df)[4:5], ".", names(meth_list)[i])
     joined <- SparkR::merge(joined, df, by = c("chr", "position", "strand"),
-                            all.x = FALSE, all.y = FALSE)
+                            all.x = all.x, all.y = all.y)
   }
   return(joined)
 }
