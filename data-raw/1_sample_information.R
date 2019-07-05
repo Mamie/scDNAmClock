@@ -70,13 +70,31 @@ dat$characteristics[28] <- "beta-cat_TG+DEN"
 
 readr::write_tsv(dat[, c("name", "geo_accession", "source", "organism", "strain", "age", "sex", "characteristics")], path = "data-raw/Zhou2016_GSE85772.tsv")
 
+# Stubbs 2017
 
-# combine the four dataset together
+dat <- readr::read_tsv("~/Downloads/GSE93957.txt", col_names = F)
+dat <- t(dat)
+colnames(dat) <- dat[1,]
+dat <- dat[-1,]
+colnames(dat) <- c("name", "geo_accession", 
+                   "organism", "age", 
+                   "source", "strain")
+dat <- as.data.frame(dat)
+dat$age <- as.numeric(purrr::map_chr(dat$age, ~stringr::str_match(.x, "([0-9]+)")[2])) * 7 / 30
+dat$sex <- "Male"
+dat$source <- gsub("tissue: ", "", dat$source)
+dat$strain <- gsub("strain: ", "", dat$strain)
+readr::write_tsv(dat[, c("name", "geo_accession", "source", "organism", "strain", "age", "sex")], path = "data-raw/Stubbs2017_GSE93957.tsv")
+
+
+# combine the datasets together
 all <- purrr::map(c("data-raw/Horvath2018_GSE120132.tsv", 
   "data-raw/Cole2017_GSE89275.tsv",
   "data-raw/Hahn2017_GSE92486.tsv",
-  "data-raw/Zhou2016_GSE85772.tsv"
-  ), readr::read_tsv) %>%
+  "data-raw/Zhou2016_GSE85772.tsv",
+  "data-raw/Stubbs2017_GSE93957.tsv"), 
+    ~readr::read_tsv(.x) %>% 
+    mutate(dataset = strsplit(as.character(.x), split = "[/_]", fixed = F)[[1]][2])) %>%
   dplyr::bind_rows() %>%
   filter(source %in% c("liver", "Liver", "Hepatocytes")) %>%
   select(-tissue) %>%

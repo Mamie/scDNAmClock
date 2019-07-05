@@ -86,12 +86,33 @@ data <- purrr::map(data, ~map_coord(.x, "/gpfs/ysm/project/mw957/data/public/lif
 
 saveRDS(data, file = "/gpfs/ysm/project/mw957/data/processed/mouse_liver/Zhou2016.rds")
 
+
+# Stubbs 2017
+# 5       3002664 3002664 100     1       0
+# 5       3002665 3002665 100     1       0
+# The Bismark CpG coverage report is tab-delimited, uses 1-based genomic coordinates for every covered cytosine position in the experiment and is in the following format: <chromosome> <start position> <end position> <methylation percentage> <count methylated> <count non-methylated>
+stubbs <- list.files("/gpfs/ysm/project/mw957/data/public/Stubbs2017/Liver",
+                   pattern = "txt.gz", full.names = T)
+id <- purrr::map_chr(stubbs, ~strsplit(.x, split = "_|/")[[1]][10])
+data <- read_meth(
+  files = stubbs,
+  chr_idx = 1,
+  pos_idx = 2,
+  met_idx = 5, 
+  unmet_idx = 6, 
+  id = id,
+  deduplicate = T,
+  header = F
+)
+
+saveRDS(data, file = "/gpfs/ysm/project/mw957/data/processed/mouse_liver/Stubbs2017.rds")
+
 # summary statistics on all datasets
-summary_stats <- data.frame(dataset = c("Zhou2016", "Hahn2017", "Cole2017", "Horvath2018"),
-           type = c("RRBS", "WGBS", "WGBS", "RRBS"),
-           genome_build = c("mm9", "mm10", "mm9", "mm10"),
-           n = c(29, 18, 32, 60),
-           complete_sites = c(9465, 3602999, NA, 1057993))
+summary_stats <- data.frame(dataset = c("Zhou2016", "Hahn2017", "Cole2017", "Stubbs2017", "Horvath2018"),
+           type = c("RRBS", "WGBS", "WGBS", "RRBS", "RRBS"),
+           genome_build = c("mm9", "mm10", "mm9", "mm10", "mm10"),
+           n = c(29, 18, 32, 15, 60),
+           complete_sites = c(9465, 3602999, NA, 2615499, 1057993))
 
 kableExtra::kable(summary_stats) %>%
   kableExtra::kable_styling()
