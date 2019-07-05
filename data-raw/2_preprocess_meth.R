@@ -112,7 +112,13 @@ summary_stats <- data.frame(dataset = c("Zhou2016", "Hahn2017", "Cole2017", "Stu
            type = c("RRBS", "WGBS", "WGBS", "RRBS", "RRBS"),
            genome_build = c("mm9", "mm10", "mm9", "mm10", "mm10"),
            n = c(29, 18, 32, 15, 60),
-           complete_sites = c(9465, 3602999, NA, 2615499, 1057993))
+           all_sites = c(9465, 42342101, NA, 9104421, 2521587))
 
 kableExtra::kable(summary_stats) %>%
   kableExtra::kable_styling()
+
+
+# convert the dataset into a methylation level matrix
+mm10 <- readRDS("/gpfs/ysm/project/mw957/data/processed/mouse_liver/mm10/Hahn2017_Horvath2018_Stubbs2017_outer_joined.rds")
+mm10 %>%
+  tidyr::gather()
