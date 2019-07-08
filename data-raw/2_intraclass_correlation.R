@@ -1,4 +1,5 @@
 library(ggplot2)
+library(tidyverse)
 
 # reproducing the problem using technical replicates
 samples <- readr::read_csv("data-raw/technical_rep_sample_lists.csv")
@@ -10,38 +11,110 @@ mapped <- data %>%
   select(-pid) %>%
   tidyr::spread(group, beta)
 colnames(mapped)[5:6] <- c("replicate 1", "replicate 2")
+
 probes_data <- split(mapped, mapped$probe)
 probe_cor <- purrr::map(probes_data, ~cor.test(.x$`replicate 1`, .x$`replicate 2`, method = "pearson"))
+
+# icc(ratings, model = c("oneway", "twoway"), 
+# type = c("consistency", "agreement"), 
+# unit = c("single", "average"), r0 = 0, conf.level = 0.95)
+
+probe_ICC <- purrr::map(probes_data, 
+                        ~irr::icc(.x[, c(5, 6)], 
+                             model = "oneway",
+                             type = "agreement",
+                             unit = "single"))
 res <- data.frame(
   probe = names(probes_data),
   cor = purrr::map_dbl(probe_cor, "estimate"),
   lwr = purrr::map_dbl(probe_cor, ~.x$conf.int[1]),
-  upr = purrr::map_dbl(probe_cor, ~.x$conf.int[2])
+  upr = purrr::map_dbl(probe_cor, ~.x$conf.int[2]),
+  icc = purrr::map_dbl(probe_ICC, ~.x$value),
+  lwr_icc = purrr::map_dbl(probe_ICC, ~.x$lbound),
+  upr_icc = purrr::map_dbl(probe_ICC, ~.x$ubound)
 )
 
 mapped <- mapped %>%
   left_join(res, by = "probe")
-
+mapped$icc_truncated <- mapped$icc
+mapped$icc_truncated[mapped$icc_truncated < 0] <- 0
 # in this analysis, we want to check the absolute consistency of the each probe
 # on two samples (probe x replicate x samples) 
 # In a interrater reliability analysis, we have raters who evaluate subjects
 # In this case, sample = subjet, replicate = rater => mean reliability of the raters (reflects probe reliability)
 
 # scatterplot of the 513 sites
-p <- ggplot(data = mapped) +
-  geom_point(aes(x = `replicate 1`, y = `replicate 2`, color = abs(cor)), size = 0.1, alpha = 0.1) +
+p <- ggplot(data = mapped %>% rename(ICC = icc_truncated)) +
+  geom_point(aes(x = `replicate 1`, y = `replicate 2`, color = ICC), size = 0.1, alpha = 0.1) +
   theme_bw() +
   theme(panel.grid = element_blank(),
         legend.position = c(0.8, 0.3)) +
-  scale_color_viridis_c()
+  scale_color_viridis_c() 
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/abs_cor.png", width = 4, height = 4)
-# compute ICC for the 513 sites
-# intraclass correlation coefficients => inter rater agreement
-# relationship with expression level
-# relationship with variation in expression level
-# interpretation of ICC
-# Koo and Li (2016)[17]:
-# below 0.50: poor
-# between 0.50 and 0.75: moderate
-# between 0.75 and 0.90: good
-# above 0.90: excellent
+
+# low consistency probes
+probe_cor <- mapped %>%
+  distinct(probe, cor, icc_truncated)
+
+p <- ggplot(data = probes_data$cg13631913) +
+  geom_point(aes(x = `replicate 1`, y = `replicate 2`), size = 2, alpha = 0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.8, 0.3),
+        plot.title = element_text(hjust = 0.5, size = 9)) +
+  ggtitle("cg13631913 (ICC = 0.0151)")
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/low_cor_1.png", width = 2.6, height = 2.6)
+
+
+p <- ggplot(data = probes_data$cg26109803) +
+  geom_point(aes(x = `replicate 1`, y = `replicate 2`), size = 2, alpha = 0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.8, 0.3),
+        plot.title = element_text(hjust = 0.5, size = 9)) +
+  ggtitle("cg26109803 (ICC = 0.0068)")
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/low_cor_2.png", width = 2.6, height = 2.6)
+
+min_max <- purrr::imap(probes_data, function(x, y) {
+  data.frame(probe = y, 
+             low = min(c(x$`replicate 1`, x$`replicate 2`)),
+             high = max(c(x$`replicate 1`, x$`replicate 2`)),
+             mean = mean(c(x$`replicate 1`, x$`replicate 2`)),
+             sd = sd(c(x$`replicate 1`, x$`replicate 2`)))
+}) %>%
+  dplyr::bind_rows() %>%
+  left_join(probe_cor, by = "probe")
+
+
+p <- ggplot(data = min_max %>% rename(ICC = icc_truncated)) +
+  geom_hline(aes(yintercept = 0.5), size = 0.4, linetype = "dashed") +
+  geom_hline(aes(yintercept = 0.75), size = 0.4, linetype = "dashed") +
+  geom_hline(aes(yintercept = 0.9), size = 0.4, linetype = "dashed") +
+  geom_point(aes(x = sd, y = ICC, color = mean), size = 1, alpha = 0.9) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.8, 0.3),
+        plot.title = element_text(hjust = 0.5, size = 9)) +
+  scale_color_viridis_c() 
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/var_cor.png", width = 4, height = 3.5)
+
+# beta values as a mixture
+plot_probe <- function(data, probe_id) {
+  x <- data %>% 
+    dplyr::filter(probe %in% probe_id) %>%
+    tidyr::gather(sid, value, -probe) %>%
+    mutate(probe = factor(probe, levels = probe_id))
+  ggplot(data = x) +
+    geom_histogram(aes(x = value), bins = 50) +
+    scale_x_continuous(limits = c(0, 1)) +
+    facet_wrap(~probe) +
+    theme_bw() +
+    theme(panel.grid = element_blank()) +
+    xlab("beta")
+}
+
+head(mapped %>% distinct(probe, icc_truncated) %>% arrange(icc_truncated) %>% .$probe)
+
+probe_list <- c("cg18771300", "cg19566405", "cg23159337", "cg26357744", "cg17324128", "cg08424423", "cg00230271", "cg01254459", "cg01651821")
+p <- plot_probe(data, probe_list)
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/histogram.png", width = 6, height = 5)
