@@ -6,11 +6,14 @@ samples <- readr::read_csv("data-raw/technical_rep_sample_lists.csv")
 data <- readr::read_tsv("data-raw/tech_rep_data.tsv")
 colnames(data) <- c("probe", samples$name)
 mapped <- data %>%
+  tidyr::drop_na() %>%
   tidyr::gather(pid, beta, -probe) %>%
   left_join(samples[, -2], by = c("pid" = "name")) %>%
   select(-pid) %>%
   tidyr::spread(group, beta)
 colnames(mapped)[5:6] <- c("replicate 1", "replicate 2")
+readr::write_csv(mapped, path = "data-raw/tech_rep_data_annotated.csv")
+
 
 probes_data <- split(mapped, mapped$probe)
 probe_cor <- purrr::map(probes_data, ~cor.test(.x$`replicate 1`, .x$`replicate 2`, method = "pearson"))
