@@ -1,5 +1,6 @@
 library(ggplot2)
 library(tidyverse)
+library(dendextend)
 
 # reproducing the problem using technical replicates
 samples <- readr::read_csv("data-raw/technical_rep_sample_lists.csv")
@@ -16,11 +17,6 @@ readr::write_csv(mapped, path = "data-raw/tech_rep_data_annotated.csv")
 
 
 probes_data <- split(mapped, mapped$probe)
-probe_cor <- purrr::map(probes_data, ~cor.test(.x$`replicate 1`, .x$`replicate 2`, method = "pearson"))
-
-# icc(ratings, model = c("oneway", "twoway"), 
-# type = c("consistency", "agreement"), 
-# unit = c("single", "average"), r0 = 0, conf.level = 0.95)
 
 probe_ICC <- purrr::map(probes_data, 
                         ~irr::icc(.x[, c(5, 6)], 
@@ -29,9 +25,6 @@ probe_ICC <- purrr::map(probes_data,
                              unit = "single"))
 res <- data.frame(
   probe = names(probes_data),
-  cor = purrr::map_dbl(probe_cor, "estimate"),
-  lwr = purrr::map_dbl(probe_cor, ~.x$conf.int[1]),
-  upr = purrr::map_dbl(probe_cor, ~.x$conf.int[2]),
   icc = purrr::map_dbl(probe_ICC, ~.x$value),
   lwr_icc = purrr::map_dbl(probe_ICC, ~.x$lbound),
   upr_icc = purrr::map_dbl(probe_ICC, ~.x$ubound)
@@ -121,3 +114,86 @@ head(mapped %>% distinct(probe, icc_truncated) %>% arrange(icc_truncated) %>% .$
 probe_list <- c("cg18771300", "cg19566405", "cg23159337", "cg26357744", "cg17324128", "cg08424423", "cg00230271", "cg01254459", "cg01651821")
 p <- plot_probe(data, probe_list)
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/histogram.png", width = 6, height = 5)
+
+
+# filter for ICC < 0.5
+probe_reliability <- mapped %>%
+  distinct(probe, icc_truncated) 
+
+probe_reliability$category <- "excellent (> 0.9)"
+probe_reliability$category[probe_reliability$icc_truncated < 0.9] <- "good (0.75 - 0.9)"
+probe_reliability$category[probe_reliability$icc_truncated < 0.75] <- "moderate (0.5 - 0.75)"
+probe_reliability$category[probe_reliability$icc_truncated < 0.5] <- "poor (< 0.5)"
+kableExtra::kable(table(probe_reliability$category)) %>%
+  kableExtra::kable_styling()
+
+poor_probes <- probe_reliability %>%
+  filter(category == "poor (< 0.5)")
+readr::write_csv(poor_probes, path = "data-raw/poor_reliability_probes.csv")
+
+poor_probes_data <- mapped %>%
+  filter(probe %in% poor_probes$probe) %>%
+  group_by(probe, sample) %>%
+  summarize(mean_beta = mean(`replicate 1`, `replicate 2`))
+
+mat <- as.matrix(tidyr::spread(poor_probes_data, probe, mean_beta)[,-1])
+bicor_dist <- function(x) {
+  as.dist(1 - WGCNA::bicor(x))
+} 
+
+dissim <- 1 - bicor_dist(mat)
+tree <- hclust(dissim, method = "ward.D2")
+plot(tree, labels = F)
+
+cor_mat <- WGCNA::bicor(mat) 
+# png(file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/cor_plot.png", width = 600, height = 600)
+# res <- corrplot::corrplot(cor_mat, diag = F, 
+#                    col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), 
+#                    tl.pos = "n", order = "hclust", hclust.method = "ward.D2",
+#                    is.corr = F, method = "color", type = "upper")
+# dev.off()
+
+
+
+res_clust <- hclust(dist(cor_mat), method = "ward.D2")
+dend <- as.dendrogram(res_clust) %>%
+  set("branches_k_color", k = 4) %>% 
+  ladderize
+pdf(file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/cor_dend.pdf", width = 6, height = 5)
+gplots::heatmap.2(cor_mat, trace = "none", labRow = F, labCol = F, col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10),
+                  Rowv = dend, Colv = dend, dendrogram = "column", symm = T,
+                  margins = c(1, 1))
+dev.off()
+
+# examine the characteristics of the clusters
+cuts <- cutree(dend, k = 4)
+table(cuts)
+
+# within cluster characteristics
+cor_mat[lower.tri(cor_mat,diag=TRUE)] <- NA # put NA
+cor_mat<-as.data.frame(as.table(cor_mat)) # as a dataframe
+cor_mat<-na.omit(cor_mat) # remove NA
+cor_mat<-cor_mat[with(cor_mat, order(-Freq)), ]
+
+cluster_map <- hashmap::hashmap(names(cuts), cuts)
+cor_mat$Var1_cluster <- purrr::map_chr(cor_mat$Var1, ~cluster_map[[.x]])
+cor_mat$Var2_cluster <- purrr::map_chr(cor_mat$Var2, ~cluster_map[[.x]])
+cor_mat %>%
+  group_by(Var1_cluster, Var2_cluster) %>%
+  rename(cluster_mean_cor = Var1_cluster) %>%
+  summarize(mean_cor = mean(Freq)) %>%
+  tidyr::spread(Var2_cluster, mean_cor) %>%
+  kableExtra::kable(., digits = 2) %>%
+  kableExtra::kable_styling()
+
+res <- t(mat) %>%
+  as.data.frame() %>%
+  mutate(probe = colnames(mat)) 
+poor_probes$cluster <- purrr::map_chr(poor_probes$probe, ~cluster_map[[.x]])
+poor_probes$ICC <- poor_probes$icc_truncated
+p <- ggplot(data = poor_probes ) + 
+  geom_histogram(aes(x = ICC)) +
+  facet_wrap(~cluster) + 
+  theme_bw() +
+  theme(panel.grid = element_blank())
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/ICC_dist.pdf", width = 4, height = 3.5)
