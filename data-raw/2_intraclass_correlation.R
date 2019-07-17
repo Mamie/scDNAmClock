@@ -127,10 +127,13 @@ probe_reliability$category[probe_reliability$icc_truncated < 0.5] <- "poor (< 0.
 kableExtra::kable(table(probe_reliability$category)) %>%
   kableExtra::kable_styling()
 
-poor_probes <- probe_reliability %>%
-  filter(category == "poor (< 0.5)")
+poor_probes <- probe_reliability# %>%
+  #filter(category == "poor (< 0.5)")
 readr::write_csv(poor_probes, path = "data-raw/poor_reliability_probes.csv")
-
+category_map <- with(poor_probes, hashmap::hashmap(probe, as.numeric(factor(category, levels = c("excellent (> 0.9)",
+                                                                                      "good (0.75 - 0.9)",
+                                                                                      "moderate (0.5 - 0.75)",
+                                                                                      "poor (< 0.5)")))))
 poor_probes_data <- mapped %>%
   filter(probe %in% poor_probes$probe) %>%
   group_by(probe, sample) %>%
@@ -143,7 +146,7 @@ bicor_dist <- function(x) {
 
 dissim <- 1 - bicor_dist(mat)
 tree <- hclust(dissim, method = "ward.D2")
-plot(tree, labels = F)
+#plot(tree, labels = F)
 
 cor_mat <- WGCNA::bicor(mat) 
 # png(file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/cor_plot.png", width = 600, height = 600)
@@ -154,15 +157,28 @@ cor_mat <- WGCNA::bicor(mat)
 # dev.off()
 
 
-
 res_clust <- hclust(dist(cor_mat), method = "ward.D2")
 dend <- as.dendrogram(res_clust) %>%
-  set("branches_k_color", k = 4) %>% 
+  #set("branches_k_color", k = 3) %>% 
   ladderize
+row_side_colors <- as.integer(purrr::map_dbl(colnames(cor_mat), 
+                                  ~category_map[[.x]]))
+colours <- viridis::inferno(4)[row_side_colors]
 pdf(file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/cor_dend.pdf", width = 6, height = 5)
 gplots::heatmap.2(cor_mat, trace = "none", labRow = F, labCol = F, col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10),
                   Rowv = dend, Colv = dend, dendrogram = "column", symm = T,
-                  margins = c(1, 1))
+                  margins = c(1, 1), RowSideColors=colours)
+legend("bottomright",
+       legend = c("excellent (> 0.9)",
+                  "good (0.75 - 0.9)",
+                  "moderate (0.5 - 0.75)",
+                  "poor (< 0.5)"),
+       col = viridis::inferno(4), 
+       lty= 1,             
+       lwd = 2,           
+       cex=.56,
+       xjust = 0
+)
 dev.off()
 
 # examine the characteristics of the clusters
@@ -197,3 +213,34 @@ p <- ggplot(data = poor_probes ) +
   theme_bw() +
   theme(panel.grid = element_blank())
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/ICC_dist.pdf", width = 4, height = 3.5)
+
+# does the model perform better after removing the low reliability probes?
+# how to use the probes with correlated expression as adjustment for noise?
+# compute svd
+
+row_clust <- hclust(dist(mat), method = "ward.D2")
+dend2 <- as.dendrogram(row_clust) %>%
+  #set("branches_k_color", k = 3) %>% 
+  ladderize
+
+pdf(file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/all_methyl.pdf", width = 6, height = 4)
+gplots::heatmap.2(apply(mat, 2, scale), trace = "none",
+                  Rowv = dend2,
+                  Colv = dend, 
+                  labRow = F, labCol = F, 
+                  col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), 
+                  margins = c(1, 1))
+dev.off()
+res <- rsvd::rsvd(mat, k = 5) # mat m patients by n probes
+# d (singular values, length k) u (left singular vectors, m by k) v (right singular vectors, n by k)
+
+reconstructed <- res$u %*% diag(res$d) %*% t(res$v) # reconstruct image
+dim(reconstructed)
+pdf(file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/all_methyl_svd.pdf", width = 6, height = 4)
+gplots::heatmap.2(apply(reconstructed, 2, scale), trace = "none",
+                  Rowv = dend2,
+                  Colv = dend, 
+                  labRow = F, labCol = F, 
+                  col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), 
+                  margins = c(1, 1))
+dev.off()
