@@ -19,7 +19,9 @@ Imports:
     SparkR,
     GenomicRanges,
     IRanges,
-    rtracklayer
+    rtracklayer,
+    rsvd,
+    tibble
 Suggests: 
     knitr,
     rmarkdown,
