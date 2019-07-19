@@ -170,8 +170,10 @@ replicate_1_names <- filter(samples, group == 1) %>%
 replicate_2_names <- filter(samples, group == 2) %>%
   .$name
 other_names <- setdiff(colnames(all_data)[-1], samples$name)
-replicate_1_svd <- rsvd::rsvd(all_data[,c(replicate_1_names, other_names)], k = 30)
-replicate_2_svd <- rsvd::rsvd(all_data[,c(replicate_2_names, other_names)], k = 30)
+replicate_1_k <- choose_k(all_data[,c(replicate_1_names, other_names)])
+replicate_2_k <- choose_k(all_data[,c(replicate_2_names, other_names)])
+replicate_1_svd <- rsvd::rsvd(all_data[,c(replicate_1_names, other_names)], k = replicate_1_k$k)
+replicate_2_svd <- rsvd::rsvd(all_data[,c(replicate_2_names, other_names)], k = replicate_2_k$k)
 
 reconstructed_1 <- replicate_1_svd$u %*% diag(replicate_1_svd$d) %*% t(replicate_1_svd$v)
 reconstructed_2 <- replicate_2_svd$u %*% diag(replicate_2_svd$d) %*% t(replicate_2_svd$v)

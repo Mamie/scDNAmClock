@@ -4,7 +4,7 @@
 \alias{TSVD_denoise}
 \title{Denoise using truncated SVD}
 \usage{
-TSVD_denoise(A, k = 30, ...)
+TSVD_denoise(A, k = 100)
 }
 \arguments{
 \item{A}{array_like; \cr
@@ -12,6 +12,9 @@ a real/complex \eqn{(m, n)} input matrix (or data frame) to be decomposed.}
 
 \item{k}{integer; \cr
 specifies the target rank of the low-rank decomposition. \eqn{k} should satisfy \eqn{k << min(m,n)}.}
+}
+\value{
+A matrix of denoised data
 }
 \description{
 Denoise using truncated SVD
