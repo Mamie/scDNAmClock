@@ -13,5 +13,6 @@ tidy_coef <- function(x, s, coef_names = NULL){
   if (!is.null(coef_names)) {
     coefs$term <- coef_names
   }
-  coefs
+  coefs %>%
+    filter(estimate != 0)
 }
