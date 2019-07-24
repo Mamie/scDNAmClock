@@ -22,3 +22,36 @@ p <- ggplot(data = plot_data) +
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/hyperparameters.png", width = 2, height = 5)
 
 # changes of the coefficients chosen
+k <- sapply(files, function(x) as.numeric(gsub(".csv", "", x)))
+data <- purrr::map(hyperparameters$k[-19], ~readr::read_csv(file.path("data-raw/hyperparameters", paste0(.x, ".csv"))) %>%
+                     mutate(k = .x)) %>%
+  dplyr::bind_rows() %>%
+  filter(term != "intercept") %>%
+  tidyr::spread(k, estimate) 
+data$n <- apply(data[-1], 1, function(x) sum(!is.na(x)))
+data <- data %>%
+  arrange(desc(n))
+plot_mat <- as.matrix(data[,-c(1, 20)])
+colnames(plot_mat) <- colnames(data)[-c(1,20)]
+rownames(plot_mat) <- data$term
+
+row_side_colors <- data$n
+colours <- viridis::inferno(18)[row_side_colors]
+
+pdf(file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/coeffs.pdf", width = 5, height = 6.5)
+gplots::heatmap.2(plot_mat, trace = "none", 
+                  labRow = F, labCol = colnames(plot_mat), 
+                  col = color.palette(c("#0047BB", "white", "#D1350F"), c(2, 2), space = "rgb")(4),
+                  Rowv = F,
+                  Colv = F,
+                  dendrogram = "none",
+                  RowSideColors = colours)
+dev.off()
+
+library(magrittr)
+data %>%
+  filter(!is.na(`650`)) %>%
+  .$term %>% 
+  length(.) %T>%
+  intersect(., scDNAmClock:::pheno_age_dat$CpG) %>%
+  length
