@@ -26,11 +26,10 @@ X3 <- X1_svd$u %*% diag(S) %*% t(X1_svd$v)
 S <- sqrt(M)/(1 + exp(((1:M) - 0.5*M)/20))
 X4 <- X1_svd$u %*% diag(S) %*% t(X1_svd$v)
 
-X1 <- X1/max(svd(X1)$d)
-X2 <- X2/max(svd(X2)$d)
-X3 <- X3/max(svd(X3)$d)
-X4 <- X4/max(svd(X4)$d)
-
+X1 <- X1/sqrt(sum(X1^2))
+X2 <- X2/sqrt(sum(X2^2))
+X3 <- X3/sqrt(sum(X3^2))
+X4 <- X4/sqrt(sum(X4^2))
 
 X0  <-  list(X1, X2, X3, X4) 
 lambda <- array(NA, dim = c(4, 4, Nl))   # thresholds
@@ -65,19 +64,10 @@ for (Ik in 1:4) { # loop over matrices
 }
 
 
-
-for (In in 4) {
+for (In in 1) {
   for (Ik in 1:4) {
     if (Ik == 1) plot(tau_w[Ik, In] * lambda[Ik, In, ], SURE[, In, Ik])
     else points(tau_w[Ik, In] * lambda[Ik, In, ], SURE[, In, Ik])
   }
 }
-
-
-
-
-
-save(list = c('SURE', 'MCR', 'MCS', 'SNR', 'lambda', 'tau_w'),
-     file = "~/Downloads/par.RData")
-
 
