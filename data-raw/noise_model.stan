@@ -7,7 +7,6 @@ data {
 }
 
 parameters {
-  vector<lower=0>[I] sigma; // standard deviation of probe noise
   real<lower=0> eta;      // hyperparameter of sigma
   vector<lower=0>[I] tau;   // standard deviation of beta for each probe
   vector<lower=0, upper=1>[I] mu; // the mean of beta for each probe
@@ -15,15 +14,14 @@ parameters {
 }
 
 model {
-  eta ~ normal(0, 0.05);
+  eta ~ normal(0, 0.005);
   for (i in 1:I) {
-    sigma[i] ~ normal(0, eta);
     tau[i] ~ normal(0, 0.05);
     mu[i] ~ normal(0, 1);
     for (j in 1:J) {
       beta[i,j] ~ normal(mu[i], tau[i]);
       for (k in 1:K) {
-        betahat[i,j,k] ~ normal(beta[i,j], sigma[i]);
+        betahat[i,j,k] ~ normal(beta[i,j], eta);
       }
     }
   }

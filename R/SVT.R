@@ -1,10 +1,11 @@
 # Candes, E.J., Sing-Long, C.A., and Trzasko, J.D.,
 # ``Unbiased Risk Estimates for Singular Value Thresholding''
 sure_svt <- function (lambda, sigma, X, s = NULL, is_real = T, svThreshold = 1e-8) {
+  #browser()
   M <- nrow(X)
   N <- ncol(X)
   if (is.null(s)) {
-    s <- svd(X)$d
+    s <- rsvd::rsvd(X)$d
     s <- s[1:min(M,N)]
   }
   R <- sure_div_svt(lambda, s, is_real, M, N, svThreshold)
@@ -18,7 +19,6 @@ sure_svt <- function (lambda, sigma, X, s = NULL, is_real = T, svThreshold = 1e-
 
 sure_div_svt <- function(lambda, s, is_real, M, N, svThreshold) {
   # check multiplicities of singular values in a robust manner
-  #browser()
   z <- s[-1]
   s <- matrix(c(s[1], 1), nrow = 1)
   Is <- 1

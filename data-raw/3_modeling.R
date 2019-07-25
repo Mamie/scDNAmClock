@@ -6,12 +6,28 @@ library(bayesplot)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = T)
 
+
 mapped <- readr::read_csv("data-raw/tech_rep_data_annotated.csv")
-probes <- unique(mapped$probe) # %>% sample(., 20)
+set.seed(100)
+probes <- unique(mapped$probe)  %>% sample(., 20)
+
+all_probes <- unique(mapped$probe)
 dat <- mapped %>%
   filter(probe %in% probes) %>%
   select(probe, sample, `replicate 1`, `replicate 2`) %>%
   arrange(probe, sample)
+all_dat <- mapped %>%
+  filter(probe %in% all_probes) %>%
+  select(probe, sample, `replicate 1`, `replicate 2`) %>%
+  arrange(probe, sample)
+sapply(split(all_dat$`replicate 1`, all_dat$probe), sd) %>%
+  quantile(.) %>%
+  kableExtra::kable(., digits = 4) %>%
+  kableExtra::kable_styling()
+apply(all_dat[,3:4], 1, sd) %>%
+  quantile(.) %>%
+  kableExtra::kable(., digits = 4) %>%
+  kableExtra::kable_styling()
 dat_split <- purrr::map(split(dat, dat$probe), 
                                  function(x) {
                                    samples <- x$sample
@@ -28,17 +44,17 @@ test_dat <- list(
 )
 probes <- names(dat_split)
 
-fit <- rstan::stan(file = "data-raw/noise_model.stan", data = test_dat, chains = 1)
+fit <- rstan::stan(file = "data-raw/noise_model.stan", data = test_dat, chains = 4)
 
 saveRDS(fit, file = "data-raw/3_modeling.rds")
 fit <- readRDS("data-raw/3_modeling.rds")
-fit <- readRDS("~/Downloads/20190709_noise_model.rds")
+#fit <- readRDS("~/Downloads/20190709_noise_model.rds")
 
 shinystan::launch_shinystan(fit)
 summary_fit <- summary(fit, pars = c("beta"))
 beta_true <- summary_fit$summary
 
-beta_true_mat <- matrix(beta_true[,1], nrow = 36, ncol = 511, byrow = F)
+beta_true_mat <- matrix(beta_true[,1], nrow = 36, ncol = 20, byrow = F)
 colnames(beta_true_mat) <- probes
 
 poor_reliability_probes <- readr::read_csv("data-raw/poor_reliability_probes.csv")
@@ -62,7 +78,7 @@ summary_replicate <- mean_replicate %>%
   group_by(probe) %>%
   summarize_all(mean) 
 p <- ggplot(data = mean_replicate) + 
-  geom_point(aes(x = beta, y = mean_betahat, color = probe), size = 0.1, alpha = 0.1) +
+  geom_point(aes(x = beta, y = mean_betahat, color = probe), size = 0.3, alpha = 0.5) +
   theme_bw() +
   theme(panel.grid = element_blank(),
         legend.position  = "none",

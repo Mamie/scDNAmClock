@@ -55,3 +55,19 @@ data %>%
   length(.) %T>%
   intersect(., scDNAmClock:::pheno_age_dat$CpG) %>%
   length
+
+# test SURE SVT on the training set
+load("data-raw/NewPhenoAge_SVD.RData")
+Nl <- 2                      #   number of values for lambda
+lambda_max <- 50            #   maximum value for lambda
+tau_w <- seq(0.001, 0.002, 0.004)
+lambda <- array(NA, dim = c(3, Nl)) # thresholds
+SURE <- array(0, dim = c(Nl, 3)) # SURE estimate
+
+for (In in 1:3) { # loop over noises
+  lambda[In, ]  <-  seq(0, lambda_max * tau_w[In], length.out = Nl) # thresholds
+  cat("lambda", In, "...\n")
+  for (Il in 1:Nl) { 
+      SURE[Il, In] <- sure_svt(lambda[In, Il], tau_w[In], datMeth_InCHIANTI)
+  }
+}
