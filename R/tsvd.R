@@ -3,9 +3,12 @@
 #' @inheritParams rsvd::rsvd
 #' @return A matrix of denoised data
 #' @export
-TSVD_denoise <- function(A, k = 100) {
-  decomposed <- rsvd::rsvd(A, k =  k, q = 2)
-  reconstructed <- decomposed$u %*% diag(decomposed$d) %*% t(decomposed$v)
+SVT_denoise <- function(A, lambda, svd = NULL) {
+  if (is.null(svd)) {
+    svd <- rsvd::rsvd(A, k = min(dim(A)), q = 2)
+  }
+  d <- soft_threshold(svd$d, lambda)
+  reconstructed <- svd$u %*% diag(d) %*% t(svd$v)
   colnames(reconstructed) <- colnames(A)
   rownames(reconstructed) <- rownames(A)
   return(reconstructed)
@@ -39,4 +42,17 @@ choose_k <- function (A, K=100, pval_thresh=1E-10, noise_start=80, q=2) {
   pvals <- pnorm(diffs, mean(diffs[noise_svals-1]), sd(diffs[noise_svals-1]))
   k <- max(which(pvals < pval_thresh))
   return (list(k = k, pvals = pvals,d = rsvd_out$d))
+}
+
+plot_SURE <- function(lambda, SURE) {
+  df <- data.frame(lambda = lambda, SURE = SURE)
+  min_lambda <- df$lambda[which.min(df$SURE)]
+  ggplot(data = df) +
+    geom_point(aes(x = lambda, y = SURE), size = 0.2) +
+    geom_vline(aes(xintercept = min_lambda), size = 0.3) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          plot.title = element_text(hjust = 0.5)) +
+    ggtitle(bquote(lambda[min] == .(round(min_lambda, 3))))  +
+    xlab(bquote(lambda))
 }

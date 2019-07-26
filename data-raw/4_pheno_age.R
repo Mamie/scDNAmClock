@@ -189,31 +189,13 @@ for (l in lambda) {
   rep2_SURE <- c(rep2_SURE, sure_svt(l, tau, rep_2_data, s = replicate_2_svd$d, is_real = T, svThreshold = 1e-8))
 }
 
-plot_SURE <- function(lambda, SURE) {
-  df <- data.frame(lambda = lambda, SURE = SURE)
-  min_lambda <- df$lambda[which.min(df$SURE)]
-  ggplot(data = df) +
-    geom_point(aes(x = lambda, y = SURE), size = 0.2) +
-    geom_vline(aes(xintercept = min_lambda), size = 0.3) +
-    theme_bw() +
-    theme(panel.grid = element_blank(),
-          plot.title = element_text(hjust = 0.5)) +
-    ggtitle(bquote(lambda[min] == .(round(min_lambda, 3))))  +
-    xlab(bquote(lambda))
-}
 
 p1 <- plot_SURE(lambda, rep1_SURE) + ylab("Replicate 1 SURE")
 p2 <- plot_SURE(lambda, rep2_SURE) + ylab("Replicate 2 SURE")
 p <- cowplot::plot_grid(p1, p2, nrow = 1, align = "h")
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/replicate_lambda.png", width = 4, height = 2)
-rep1_s_shrinked <- soft_threshold(replicate_1_svd$d, lambda[which.min(rep1_SURE)])
-rep2_s_shrinked <- soft_threshold(replicate_2_svd$d, lambda[which.min(rep2_SURE)])
-
-reconstructed_1 <- replicate_1_svd$u %*% diag(rep1_s_shrinked) %*% t(replicate_1_svd$v)
-reconstructed_2 <- replicate_2_svd$u %*% diag(rep2_s_shrinked) %*% t(replicate_2_svd$v)
-
-colnames(reconstructed_1) <- c(replicate_1_names, other_names)
-colnames(reconstructed_2) <- c(replicate_2_names, other_names)
+reconstructed_1 <- SVT_denoise(rep_1_data, lambda = lambda[which.min(rep1_SURE)], svd = replicate_1_svd)
+reconstructed_2 <- SVT_denoise(rep_2_data, lambda = lambda[which.min(rep2_SURE)], svd = replicate_2_svd)
 
 truncated_reconstructed <- as.data.frame(cbind(reconstructed_1[, replicate_1_names], 
                                  reconstructed_2[, replicate_2_names]))
