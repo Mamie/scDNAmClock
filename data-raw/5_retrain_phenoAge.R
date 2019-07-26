@@ -14,7 +14,6 @@ CV = cv.glmnet(datMeth_InCHIANTI,Pheno_InCHIANTI$PredAge, nfolds=10, alpha=0.5, 
 CV_coef <- scDNAmClock:::tidy_coef(CV, s = CV$lambda.min, coef_names = c("intercept", colnames(datMeth_InCHIANTI))) 
 
 fit = glmnet(datMeth_InCHIANTI, Pheno_InCHIANTI$PredAge, family="gaussian", alpha=0.5, nlambda=100)
-# plot(CV, main="CV Elastic Net")
 
 # original performance 
 DNAmPhenoAge_Train <- as.numeric(predict(fit, datMeth_InCHIANTI, type="response", s=CV$lambda.min))
@@ -44,7 +43,7 @@ abline(0,1,col="red")
 set.seed(120)
 k <- 500
 datMeth_InCHIANTI_k <- choose_k(datMeth_InCHIANTI, K = k, pval_thresh = 1e-10, noise_start = k * 0.8)
-datMeth_InCHIANTI_SVD <- TSVD_denoise(datMeth_InCHIANTI, datMeth_InCHIANTI_k$k)
+InCHIANTI_SVD <- rsvd::rsvd(datMeth_InCHIANTI, k = min(dim(datMeth_InCHIANTI)))
 
 datMeth_WHI_k <- choose_k(datMeth_WHI, K = k, pval_thresh = 1e-10, noise_start = k * 0.8)
 datMeth_WHI_SVD <- TSVD_denoise(datMeth_WHI, k = datMeth_WHI_k$k)

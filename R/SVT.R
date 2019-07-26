@@ -81,3 +81,10 @@ div_svt_complex <- function(lambda, s, idx_p, M, N) {
   x 	=   x + 4 * sum(D)
   return(x)
 }
+
+soft_threshold <- function(s, lambda) {
+  less_than_lambda <- s < lambda
+  s <- s - lambda
+  s[less_than_lambda] <- 0
+  return(s)
+}

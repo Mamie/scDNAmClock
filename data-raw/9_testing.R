@@ -16,13 +16,12 @@ rownames(SURE) <- taus
 colnames(SURE) <- 1:nl
 lambda_max <- 50
 
-sd <- apply(datMeth_InCHIANTI, 2, sd)
-quantile(sd, probs = c(1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2))  %>%
-  kableExtra::kable() %>%
-  kableExtra::kable_styling()
-
+set.seed(1)
 InCHIANTI_SVD <- rsvd::rsvd(datMeth_InCHIANTI, k = min(dim(datMeth_InCHIANTI)))
 saveRDS(InCHIANTI_SVD, file = "data-raw/InCHIANTI_SVD.rds")
+WHI_SVD <- rsvd::rsvd(datMeth_WHI, k = min(dim(datMeth_WHI)))
+saveRDS(WHI_SVD, file = "data-raw/WHI_SVD.rds")
+
 
 for (i in seq_along(taus)) {
   cat("tau:", taus[i], "\n")
@@ -48,7 +47,7 @@ ggplot(data = SURE_data %>%
   theme_bw() +
   theme(panel.grid = element_blank(),
         strip.background = element_blank()) +
-  #facet_wrap(~tau, scale = "free") +
+  facet_wrap(~tau, scale = "free") +
   ylab("SURE") +
   xlab("lambda") +
   scale_x_continuous(labels = scDNAmClock:::fancy_scientific) 
@@ -59,7 +58,6 @@ SURE_data %>%
 # get an estimate for noise level
 
 
-shrinked <- 
 
 set.seed(120)
 CV_SVD = cv.glmnet(model_650, Pheno_InCHIANTI$PredAge, nfolds=10, alpha=0.5, family="gaussian")
