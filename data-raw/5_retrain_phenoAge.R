@@ -48,7 +48,7 @@ InCHIANTI_SVD <- readRDS("data-raw/InCHIANTI_SVD.rds")
 WHI_SVD <- readRDS("data-raw/WHI_SVD.rds")
 
 # select the lambda shrinkage parameter using the SURE
-tau <- 0.012
+tau <- 0.013
 lambda <- seq(0, tau * 200, length.out = 100)
 InCHIANTI_SURE <- c()
 WHI_SURE <- c()
@@ -82,7 +82,7 @@ metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = PhenoAge_InCHIANT
   kableExtra::kable_styling()
 
 
-p <- ggplot(data = data.frame(orig = PhenoAge_InCHIANTI$y, SVT = PhenoAge_InCHIANTI_SVT$y)) +
+p <- ggplot(data = data.frame(orig = PhenoAge_InCHIANTI, SVT = PhenoAge_InCHIANTI_SVT)) +
   geom_point(aes(x = orig, y = SVT), size = 0.1, alpha = 0.2) +
   theme_bw() +
   geom_abline() +
@@ -129,7 +129,10 @@ p <- coefs %>%
   geom_hline(aes(yintercept = 1), linetype = "dashed")
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/WHI_cox_SVT.png", width = 4, height = 3)
 
-
+  
+  
+  
+  
 set.seed(120)
 CV_SVD = cv.glmnet(InCHINATI_SVT, Pheno_InCHIANTI$PredAge, nfolds=10, alpha=0, family="gaussian")
 fit_SVD = glmnet(InCHINATI_SVT,Pheno_InCHIANTI$PredAge, family="gaussian", alpha=0, nlambda=100)

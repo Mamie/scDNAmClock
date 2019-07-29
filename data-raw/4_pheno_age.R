@@ -15,6 +15,8 @@ mapped <- data %>%
   select(-pid) %>%
   tidyr::spread(group, beta)
 colnames(mapped)[5:6] <- c("replicate 1", "replicate 2")
+readr::write_csv(mapped, "data-raw/phenoage_probes_technical_estimate.csv")
+
 probes_data <- split(mapped, mapped$probe)
 
 probe_ICC <- purrr::map(probes_data, 
@@ -32,6 +34,7 @@ probe_ICC$ICC[probe_ICC$ICC < 0] <- 0
 data_mat <- as.matrix(data[,-1])
 rownames(data_mat) <- data$probe
 pheno_age <- scDNAmClock::PhenoAge(data_mat)
+
 
 plot_data <- data.frame(name = names(pheno_age$y), 
                         pheno_age = unname(pheno_age$y)) %>%
@@ -69,6 +72,8 @@ ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_
 res <- t(as.matrix(summary(plot_data$abs_diff)))
 kableExtra::kable(res, digits = 2) %>%
   kableExtra::kable_styling()
+
+
 
 # examine variability contribution
 summary_data <- as.data.frame(pheno_age$Ax) %>%
@@ -140,6 +145,49 @@ summary_data$abs_dev_div_weight <- summary_data$abs_deviation/abs(summary_data$w
 summary_data %>%
   arrange(desc(abs_dev_div_weight))
 
+# detailed source of variation 
+anova_data <- as.data.frame(pheno_age$Ax) %>%
+  mutate(probe = rownames(pheno_age$Ax)) %>%
+  tidyr::gather(name, Ax, -probe) %>%
+  dplyr::left_join(select(samples, c(name, group, sample))) %>%
+  select(-name) %>% 
+  tidyr::spread(group, Ax) %>%
+  mutate(`rep1_rep2` = abs(`1` - `2`))
+
+
+p1 <- ggplot(data = anova_data) +
+  geom_hline(aes(yintercept = 0.5), linetype = "dashed") +
+  geom_point(aes(x = reorder(probe, rep1_rep2), y = rep1_rep2), size = 0.1, alpha = 0.5,
+             color = "steelblue") +
+  theme_classic() +
+  coord_flip() +
+  theme(panel.grid = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  xlab("CpG sites") +
+  ylab("Weighted absolute PhenoAge replicate difference")  +
+  scale_y_continuous(limits = c(0, 2.5))
+
+
+ordering <- levels(with(anova_data, reorder(probe, rep1_rep2)))
+# plot the weights
+p2 <- ggplot(data = data.frame(probe = scDNAmClock:::pheno_age_dat$CpG, weight = abs(scDNAmClock:::pheno_age_dat$weight)) %>%
+           left_join(probe_ICC, by = "probe") %>% 
+             mutate(probe = factor(probe, levels = ordering)) ) +
+  geom_point(aes(x = probe, y = weight, color = ICC), size = 1, alpha = 0.5) +
+  theme_classic() +
+  coord_flip() +
+  theme(panel.grid = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank(),
+        legend.position = c(0.9, 0.2)) +
+  xlab("CpG sites") +
+  ylab("Absolute weight") +
+  scale_color_viridis_c()
+p <- cowplot::plot_grid(p1, p2, nrow = 1, align = "h", rel_widths = c(1, 1))
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/probe_contribution.png", width = 7.5, height = 5)
+
 # preprcessing for the full dataset
 data <- readRDS("/gpfs/ysm/project/mw957/data/processed/Lehne2015/Lehne2015_beta.rds") # 473864
 # filter for probes with sd > 0.0042 (based on minimum sd of the Levine PhenoAge probe)
@@ -177,7 +225,7 @@ set.seed(1)
 replicate_1_svd <- rsvd::rsvd(rep_1_data, k = min(dim(rep_1_data)), q = 2)
 replicate_2_svd <- rsvd::rsvd(rep_2_data, k = min(dim(rep_2_data)), q = 2)
 
-tau <- 0.012
+tau <- 0.013
 lambda <- seq(0, tau * 50, length.out = 50)
 rep1_SURE <- c()
 rep2_SURE <- c()
@@ -188,7 +236,6 @@ for (l in lambda) {
 for (l in lambda) {
   rep2_SURE <- c(rep2_SURE, sure_svt(l, tau, rep_2_data, s = replicate_2_svd$d, is_real = T, svThreshold = 1e-8))
 }
-
 
 p1 <- plot_SURE(lambda, rep1_SURE) + ylab("Replicate 1 SURE")
 p2 <- plot_SURE(lambda, rep2_SURE) + ylab("Replicate 2 SURE")
@@ -203,7 +250,7 @@ truncated_reconstructed_mat <- as.matrix(truncated_reconstructed)
 rownames(truncated_reconstructed_mat) <- all_data$ID_REF
 truncated_reconstructed$probe <- all_data$ID_REF
 
-pheno_age_2 <- scDNAmClock::PhenoAge(t(truncated_reconstructed_mat))
+pheno_age_2 <- scDNAmClock::PhenoAge(truncated_reconstructed_mat)
 
 plot_data_2 <- data.frame(name = names(pheno_age_2$y), 
                         pheno_age = unname(pheno_age_2$y)) %>%
@@ -296,7 +343,6 @@ p <- ggplot(data = summary_data_combined,
 p <- ggplot(data = summary_data_combined) +
   geom_abline(size = 0.2) +
   geom_point(aes(x = abs_deviation, y = truncated_abs_deviation, color = ICC), size = 0.3, alpha = 0.8) +
-  
   theme_bw() +
   theme(panel.grid = element_blank(),
         strip.background = element_blank()) +
@@ -317,9 +363,65 @@ normed <- t(apply(original_dat, 1, scale))
 
 ha <- ComplexHeatmap::HeatmapAnnotation(sample = as.character(labels),
                                         show_legend = c(sample = F))
-ht1 <- ComplexHeatmap::Heatmap(normed, name = "original", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha)
-ht2 <- ComplexHeatmap::Heatmap(SVT_normed, name = "SVT", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha)
+ht1 <- ComplexHeatmap::Heatmap(normed, name = "original", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha, show_row_names = F)
+ht2 <- ComplexHeatmap::Heatmap(SVT_normed, name = "SVT", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha, show_row_names = F)
 
-pdf("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/replicate_heatmap.pdf", width = 6, height = 5)
+png("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/replicate_heatmap.png", width = 600, height = 500)
 ht1 + ht2
 dev.off()
+
+# examine the contribution of probes to deviation 
+anova_data_2 <- as.data.frame(pheno_age_2$Ax) %>%
+  mutate(probe = rownames(pheno_age_2$Ax)) %>%
+  tidyr::gather(name, Ax, -probe) %>%
+  dplyr::left_join(select(samples, c(name, group, sample))) %>%
+  select(-name) %>% 
+  tidyr::spread(group, Ax) %>%
+  mutate(`rep1_rep2` = abs(`1` - `2`))  %>%
+  mutate(probe = factor(probe, levels = ordering))
+
+
+p1_2 <- ggplot(data = anova_data_2) +
+  geom_hline(aes(yintercept = 0.5), linetype = "dashed") +
+  geom_point(aes(x = probe, y = rep1_rep2), size = 0.1, alpha = 0.5,
+             color = "steelblue") +
+  theme_classic() +
+  coord_flip() +
+  theme(panel.grid = element_blank(), 
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  xlab("CpG sites") +
+  ylab("Weighted absolute PhenoAge replicate difference") +
+  scale_y_continuous(limits = c(0, 2.5))
+
+
+p <- cowplot::plot_grid(p1, p1_2, nrow = 1, align = "h", rel_widths = c(1, 1))
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/probe_contribution_2.png", width = 7.5, height = 5)
+
+# patients who have PhenoAge difference greater than 2 years
+patient_diff <- data.frame(y = pheno_age_2$y) %>%
+  mutate(name = colnames(pheno_age_2$Ax)) %>%
+  dplyr::left_join(select(samples, c(name, group, sample))) %>%
+  select(-name) %>% 
+  tidyr::spread(group, y) %>%
+  mutate(`rep1_rep2` = abs(`1` - `2`)) %>%
+  arrange(desc(rep1_rep2))# 15 patients
+
+
+all_probes <-  anova_data_2 %>%
+  select(-c(`1`, `2`)) %>%
+  group_by(probe) %>%
+  mutate(mean = mean(rep1_rep2)) %>%
+  mutate(sample = factor(sample, levels = patient_diff$sample)) %>%
+  tidyr::spread(sample, rep1_rep2) %>%
+  arrange(desc(mean)) 
+  
+
+all_probes_mat <- as.matrix(all_probes[,-c(1,2)])
+
+ha <- ComplexHeatmap::HeatmapAnnotation(`PhenoAge difference` = patient_diff$rep1_rep2)
+ht1 <- ComplexHeatmap::Heatmap(all_probes_mat, name = "original", top_annotation = ha, show_row_names = F, cluster_rows = F, cluster_columns = F)
+png("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/probe_contribution_3.png", width = 500, height = 500)
+ht1
+dev.off()
+
