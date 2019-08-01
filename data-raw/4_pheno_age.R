@@ -225,22 +225,58 @@ set.seed(1)
 replicate_1_svd <- rsvd::rsvd(rep_1_data, k = min(dim(rep_1_data)), q = 2)
 replicate_2_svd <- rsvd::rsvd(rep_2_data, k = min(dim(rep_2_data)), q = 2)
 
-tau <- 0.013
-lambda <- seq(0, tau * 50, length.out = 50)
-rep1_SURE <- c()
-rep2_SURE <- c()
-for (l in lambda) {
-  rep1_SURE <- c(rep1_SURE, sure_svt(l, tau, rep_1_data, s = replicate_1_svd$d, is_real = T, svThreshold = 1e-8))
+# estimate the noise standard deviation 
+noises <- rep_1_data[,replicate_1_names] - rep_2_data[,replicate_2_names]
+expression <- (rep_1_data[,replicate_1_names] + rep_2_data[,replicate_2_names])/2
+
+p <- ggplot(data = data.frame(expression = unlist(expression), noise = unlist(noises))) +
+  geom_point(aes(x = expression, y = noise), color = "steelblue", alpha = 0.4, size = 0.1) +
+  theme_classic() +
+  theme(panel.grid = element_blank()) +
+  xlab(expression(bar(hat(beta)[ij]))) +
+  ylab(hat(beta)[ij1]~"-"~hat(beta)[ij2])
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/heteroscedasticity.png", width = 5, height = 4)
+
+p <- ggplot(data = data.frame(noise = unlist(noises)), aes(x = noise)) +
+  geom_histogram(bins = 40, aes(y=..density..), fill = "steelblue") +
+  theme_classic() +
+  theme(panel.grid = element_blank()) +
+  stat_function(fun = dnorm, args = list(mean = mean(unlist(noises)), sd = sd(unlist(noises)))) +
+  xlab(hat(beta)[ij1]~"-"~hat(beta)[ij2])
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/density.png", width = 5, height = 4)
+
+sd(unlist(noises))/sqrt(2)
+
+
+n_lambda <- 50
+lambda_max <- 60
+tau <- c(0.014)
+n_tau <- length(tau)
+lambda <- matrix(NA, nrow = n_tau, ncol = n_lambda)
+for (i in seq_along(tau)) {
+  lambda[i,] <- seq(0, tau[i] * n_lambda, length.out = n_lambda)
 }
 
-for (l in lambda) {
-  rep2_SURE <- c(rep2_SURE, sure_svt(l, tau, rep_2_data, s = replicate_2_svd$d, is_real = T, svThreshold = 1e-8))
+rep1_SURE <- rep2_SURE <- matrix(NA, nrow = n_tau, ncol = n_lambda)
+
+for (i in seq(n_tau)) {
+  for (j in seq(n_lambda)) {
+    rep1_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], rep_1_data, s = replicate_1_svd$d, is_real = T, svThreshold = 1e-8)
+  }
 }
 
-p1 <- plot_SURE(lambda, rep1_SURE) + ylab("Replicate 1 SURE")
-p2 <- plot_SURE(lambda, rep2_SURE) + ylab("Replicate 2 SURE")
+for (i in seq(n_tau)) {
+  for (j in seq(n_lambda)) {
+    rep2_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], rep_2_data, s = replicate_2_svd$d, is_real = T, svThreshold = 1e-8)
+  }
+}
+
+i <- 1
+p1 <- plot_SURE(lambda[i,], rep1_SURE[i,]) + ylab("Replicate 1 SURE")
+p2 <- plot_SURE(lambda[i,], rep2_SURE[i,]) + ylab("Replicate 2 SURE")
 p <- cowplot::plot_grid(p1, p2, nrow = 1, align = "h")
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/replicate_lambda.png", width = 4, height = 2)
+
 reconstructed_1 <- SVT_denoise(rep_1_data, lambda = lambda[which.min(rep1_SURE)], svd = replicate_1_svd)
 reconstructed_2 <- SVT_denoise(rep_2_data, lambda = lambda[which.min(rep2_SURE)], svd = replicate_2_svd)
 
@@ -298,7 +334,6 @@ p <- ggplot(data = combined_data) +
   
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/phenoage_hist.pdf", width = 4, height = 3)  
 
-
 # examine variability contribution
 summary_data_2 <- as.data.frame(pheno_age_2$Ax) %>%
   mutate(probe = rownames(pheno_age_2$Ax)) %>%
@@ -354,21 +389,6 @@ p <- ggplot(data = summary_data_combined) +
   ylab("Absolute PhenoAge difference (SVT)")
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/probe_variation_box_2.pdf", width = 4, height = 3)
 
-# replicate data visualization
-original_dat <- cbind(rep_1_data[,replicate_1_names], rep_2_data[,replicate_2_names])
-SVT_dat <- cbind(reconstructed_1[,replicate_1_names], reconstructed_2[,replicate_2_names])
-labels <- c(seq(36), seq(36))
-SVT_normed <- t(apply(SVT_dat, 1, scale))
-normed <- t(apply(original_dat, 1, scale))
-
-ha <- ComplexHeatmap::HeatmapAnnotation(sample = as.character(labels),
-                                        show_legend = c(sample = F))
-ht1 <- ComplexHeatmap::Heatmap(normed, name = "original", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha, show_row_names = F)
-ht2 <- ComplexHeatmap::Heatmap(SVT_normed, name = "SVT", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha, show_row_names = F)
-
-png("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/replicate_heatmap.png", width = 600, height = 500)
-ht1 + ht2
-dev.off()
 
 # examine the contribution of probes to deviation 
 anova_data_2 <- as.data.frame(pheno_age_2$Ax) %>%
@@ -416,7 +436,6 @@ all_probes <-  anova_data_2 %>%
   tidyr::spread(sample, rep1_rep2) %>%
   arrange(desc(mean)) 
   
-
 all_probes_mat <- as.matrix(all_probes[,-c(1,2)])
 
 ha <- ComplexHeatmap::HeatmapAnnotation(`PhenoAge difference` = patient_diff$rep1_rep2)
@@ -425,3 +444,232 @@ png("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/fi
 ht1
 dev.off()
 
+# what happens to the extreme outliers after correction
+noises_after <- reconstructed_1[, replicate_1_names] - reconstructed_2[, replicate_2_names]
+#expression <- (reconstructed_1[, replicate_1_names] + reconstructed_2[, replicate_2_names])/2
+
+p <- ggplot(data = data.frame(noise = unlist(noises), noise_after = as.numeric(noises_after))) +
+  geom_abline() +
+  geom_hline(aes(yintercept = 0)) +
+  geom_point(aes(x = noise, y = noise_after), color = "steelblue", alpha = 0.3, size = 0.2) +
+  theme_classic() +
+  theme(panel.grid = element_blank()) +
+  xlab(hat(beta)[ij1]~"-"~hat(beta)[ij2]~"(original)") +
+  ylab(hat(beta)[ij1]~"-"~hat(beta)[ij2]~"(SVT)") 
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/noise_after.png", width = 5, height = 4)
+
+# Examine the outliers
+outliers <- noises %>%
+  as.data.frame() %>%
+  mutate(probe = scDNAmClock:::pheno_age_dat$CpG) %>%
+  tidyr::gather(name, noise, -probe) %>%
+  mutate(gt.05 = noise > 0.05 | noise < -0.05) %>%
+  group_by(probe) %>%
+  summarize(outlier_counts = sum(gt.05))
+p <- ggplot(data = as.data.frame(outliers)) +
+  geom_histogram(aes(x = outlier_counts)) +
+  theme_classic() +
+  theme(panel.grid = element_blank()) +
+  xlab("outlier counts")
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/outlier_probes.png", width = 5, height = 4)
+
+# Can these outliers be corrected by truncation? 
+# plot of noise and plot of actual values
+dat <- data.frame(
+  rep_1 = unlist(all_data[which(scDNAmClock:::pheno_age_dat$CpG %in% "cg17133388"), replicate_1_names]),
+  rep_2 = unlist(all_data[which(scDNAmClock:::pheno_age_dat$CpG %in% "cg17133388"), replicate_2_names]),
+  noise = unlist(noises[which(scDNAmClock:::pheno_age_dat$CpG %in% "cg17133388"),])
+) %>%
+  mutate(outlier = abs(rep_1 - median(rep_1)) > 1.5 * IQR(rep_1) | abs(rep_2 - median(rep_2)) > 1.5 * IQR(rep_2) ) 
+
+# shrink outliers
+NA_outlier <- function(x, a = 1.5) {
+  iqr <- IQR(x)
+  median <- median(x)
+  x[x > median + a * iqr] <- NA#median + a * iqr
+  x[x < median - a * iqr] <- NA#median - a * iqr
+  x
+}
+
+truncate_outlier <- function(x, a = 1.5) {
+  iqr <- IQR(x)
+  median <- median(x)
+  x[x > median + a * iqr] <- median + a * iqr
+  x[x < median - a * iqr] <- median - a * iqr
+  x
+}
+
+p1 <- ggplot(data = dat, aes(x = rep_1, y = rep_2, color = abs(noise))) +
+  geom_abline(size = 0.1) +
+  geom_abline(aes(slope = 1, intercept = 0.05), size = 0.1) +
+  geom_abline(aes(slope = 1, intercept = -0.05), size = 0.1) +
+  geom_point() +
+  scale_color_viridis_c()+
+  theme_classic() +
+  theme(panel.grid = element_blank()) +
+  xlab("outlier counts") +
+  geom_rug(col=rgb(.5,0,0,alpha=.2)) +
+  scale_x_continuous(limits = c(0.1, 0.5)) +
+  scale_y_continuous(limits = c(0.1, 0.5))
+
+dat$rep_1 <- truncate_outlier(dat$rep_1)
+dat$rep_2 <- truncate_outlier(dat$rep_2)
+
+p2 <- ggplot(data = dat, aes(x = rep_1, y = rep_2, color = abs(noise))) +
+  geom_abline(size = 0.1) +
+  geom_abline(aes(slope = 1, intercept = 0.05), size = 0.1) +
+  geom_abline(aes(slope = 1, intercept = -0.05), size = 0.1) +
+  geom_point() +
+  scale_color_viridis_c()+
+  theme_classic() +
+  theme(panel.grid = element_blank()) +
+  xlab("outlier counts") +
+  geom_rug(col=rgb(.5,0,0,alpha=.2)) +
+  scale_x_continuous(limits = c(0.1, 0.5)) +
+  scale_y_continuous(limits = c(0.1, 0.5))
+
+dat$rep_1 <- rep_1_data_2[which(scDNAmClock:::pheno_age_dat$CpG %in% "cg17133388"), replicate_1_names]
+dat$rep_2 <- rep_2_data_2[which(scDNAmClock:::pheno_age_dat$CpG %in% "cg17133388"), replicate_2_names]
+
+p3 <- ggplot(data = dat, aes(x = rep_1, y = rep_2, color = abs(noise))) +
+  geom_abline(size = 0.1) +
+  geom_abline(aes(slope = 1, intercept = 0.05), size = 0.1) +
+  geom_abline(aes(slope = 1, intercept = -0.05), size = 0.1) +
+  geom_point() +
+  scale_color_viridis_c()+
+  theme_classic() +
+  theme(panel.grid = element_blank()) +
+  xlab("outlier counts") +
+  geom_rug(col=rgb(.5,0,0,alpha=.2)) +
+  scale_x_continuous(limits = c(0.1, 0.5)) +
+  scale_y_continuous(limits = c(0.1, 0.5))
+
+p <- cowplot::plot_grid(p1, p2, nrow = 1)
+
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/outlier_probes_ex.png", width = 9, height = 4)
+
+
+
+
+###############################################
+# detecting outliers (package cellWise)
+
+rep_1_data_2 <- t(apply(rep_1_data, 1, truncate_outlier))
+rep_2_data_2 <- t(apply(rep_2_data, 1, truncate_outlier))
+
+set.seed(100)
+rep_1_svd_2 <- rsvd::rsvd(rep_1_data_2, k = min(dim(rep_1_data_2)), q = 2)
+rep_2_svd_2 <- rsvd::rsvd(rep_2_data_2, k = min(dim(rep_2_data_2)), q = 2)
+
+sd(rep_1_data_2[,replicate_1_names] - rep_2_data_2[,replicate_2_names])/sqrt(2)
+
+n_lambda <- 50
+lambda_max <- 60
+tau <- sd(rep_1_data_2[,replicate_1_names] - rep_2_data_2[,replicate_2_names])/sqrt(2)
+n_tau <- length(tau)
+lambda <- matrix(NA, nrow = n_tau, ncol = n_lambda)
+for (i in seq_along(tau)) {
+  lambda[i,] <- seq(0, tau[i] * n_lambda, length.out = n_lambda)
+}
+
+rep1_SURE <- rep2_SURE <- matrix(NA, nrow = n_tau, ncol = n_lambda)
+
+for (i in seq(n_tau)) {
+  for (j in seq(n_lambda)) {
+    rep1_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], rep_1_data_2, s = rep_1_svd_2$d, is_real = T, svThreshold = 1e-8)
+  }
+}
+
+for (i in seq(n_tau)) {
+  for (j in seq(n_lambda)) {
+    rep2_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], rep_2_data_2, s = rep_2_svd_2$d, is_real = T, svThreshold = 1e-8)
+  }
+}
+
+i <- 1
+p1 <- plot_SURE(lambda[i,], rep1_SURE[i,]) + ylab("Replicate 1 SURE")
+p2 <- plot_SURE(lambda[i,], rep2_SURE[i,]) + ylab("Replicate 2 SURE")
+p <- cowplot::plot_grid(p1, p2, nrow = 1, align = "h")
+
+reconstructed_1 <- SVT_denoise(rep_1_data_2, lambda = lambda[which.min(rep1_SURE)], svd = rep_1_svd_2)
+reconstructed_2 <- SVT_denoise(rep_2_data_2, lambda = lambda[which.min(rep2_SURE)], svd = rep_2_svd_2)
+
+# truncated_reconstructed <- as.data.frame(cbind(reconstructed_1[, replicate_1_names], 
+#                                                reconstructed_2[, replicate_2_names]))
+# truncated_reconstructed_mat <- as.matrix(truncated_reconstructed)
+# rownames(truncated_reconstructed_mat) <- all_data$ID_REF
+# truncated_reconstructed$probe <- all_data$ID_REF
+
+truncated_reconstructed <- as.data.frame(cbind(rep_1_data_2[, replicate_1_names], 
+                                               rep_2_data_2[, replicate_2_names]))
+truncated_reconstructed_mat <- as.matrix(truncated_reconstructed)
+rownames(truncated_reconstructed_mat) <- all_data$ID_REF
+truncated_reconstructed$probe <- all_data$ID_REF
+
+pheno_age_2 <- scDNAmClock::PhenoAge(truncated_reconstructed_mat)
+
+plot_data_2 <- data.frame(name = names(pheno_age_2$y), 
+                          pheno_age = unname(pheno_age_2$y)) %>%
+  left_join(samples, by = "name") %>%
+  select(-c(name, geo_accession)) %>%
+  tidyr::spread(group, pheno_age) %>%
+  mutate(diff = `1` - `2`, abs_diff = abs(`1` - `2`)) 
+
+combined_data <- cbind(plot_data_2[, 4:6], plot_data[, 4:6])
+colnames(combined_data)[1:3] <- c("SVD_1", "SVD_2", "SVD_diff")
+
+cols <- c("SVT" = "steelblue", 
+          "Original" = "gray")
+
+p <- ggplot(data = combined_data) +
+  geom_abline(alpha = 0.6, linetype = "dashed") +
+  geom_abline(intercept = 5, alpha = 0.3, linetype = "dashed") +
+  geom_abline(intercept = -5, alpha = 0.3, linetype = "dashed") +
+  
+  geom_point(aes(x = `1`, y = `2`, color = "Original"), size = 1) +
+  geom_point(aes(x = SVD_1, y = SVD_2, color = "SVT"), size = 2) +
+  geom_segment(aes(x = `1`, y = `2`, xend = SVD_1, yend = SVD_2), 
+               arrow = arrow(length = unit(0.01, "npc")), alpha = 0.3) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  scale_color_manual(name = "", values = cols) +
+  theme(legend.position = c(0.7, 0.2)) +
+  xlab("Replicate 1") +
+  ylab("Replicate 2") 
+p
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/phenoage_svd_truncated_2.pdf", width = 4, height = 3)  
+
+cols <- c("SVT" = "steelblue", 
+          "Original" = "gray")
+
+p <- ggplot(data = combined_data) +
+  geom_histogram(aes(x = abs(diff), fill = "Original"), bins = 10, alpha = 0.8) +
+  geom_histogram(aes(x = abs(SVD_diff), fill = "SVT"), bins = 10, alpha = 0.8) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.8, 0.8)) +
+  xlab("Absolute PhenoAge replicate difference") +
+  scale_y_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_fill_manual(name = "", values = cols)
+
+ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/phenoage_hist_2.pdf", width = 4, height = 3)  
+
+
+
+# replicate data visualization
+original_dat <- cbind(rep_1_data[,replicate_1_names], rep_2_data[,replicate_2_names])
+SVT_dat <- cbind(reconstructed_1[,replicate_1_names], reconstructed_2[,replicate_2_names])
+labels <- c(seq(36), seq(36))
+SVT_normed <- t(apply(SVT_dat, 1, scale))
+normed <- t(apply(original_dat, 1, scale))
+
+ha <- ComplexHeatmap::HeatmapAnnotation(sample = as.character(labels),
+                                        show_legend = c(sample = F))
+ht1 <- ComplexHeatmap::Heatmap(normed, name = "original", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha, show_row_names = F)
+ht2 <- ComplexHeatmap::Heatmap(SVT_normed, name = "SVT", col = colorRampPalette(c("#0047BB", "white", "#D1350F"))(10), top_annotation = ha, show_row_names = F)
+
+png("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/replicate_heatmap.png", width = 600, height = 500)
+ht1 + ht2
+dev.off()
+
+# applying capping on the dataset

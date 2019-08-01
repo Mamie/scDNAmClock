@@ -39,7 +39,7 @@ abline(0,1,col="red") # correlation of predicted phenoage with actual age in tes
 WGCNA::verboseScatterplot(Pheno_WHI$agewhi,Pheno_WHI$DNAmPhenoAge,xlab="Age",ylab="Original DNAmPhenoAge",main="Validation Set") # ? not the original DNAmPhenoAge
 abline(0,1,col="red")
 
-# perform SVD 
+# perform SVD
 set.seed(120)
 InCHIANTI_SVD <- rsvd::rsvd(datMeth_InCHIANTI, k = min(dim(datMeth_InCHIANTI)))
 set.seed(120)

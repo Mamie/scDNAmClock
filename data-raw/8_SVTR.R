@@ -38,25 +38,25 @@ MCR <- array(0, dim = c(Nl, 4, 4)) #  Monte Carlo estimated risk
 MCS <- array(0, dim = c(Nl, 4, 4, Ns)) # Monte Carlo samples
 SURE <- array(0, dim = c(Nl, 4, 4)) # SURE estimate
 
-for (Ik in 1:4) { # loop over matrices
+for (Ik in 1) { # loop over matrices 1:4
   cat("Matrix", Ik, "...\n")
   X <- X0[[Ik]]
-  for (In in 1:4) { # loop over SNR
+  for (In in 1) { # loop over SNR 1:4
     tau_w[Ik, In] <- 1/(SNR[In] * sqrt(M*N)) # noise standard-deviation
     lambda[Ik, In, ]  <- seq(0, lambda_max * tau_w[Ik, In], length.out = Nl) # thresholds
     
-     for (Il in 1:Nl) { # loop over lambda
-    #   for (Is in 1:Ns) { # Monte Carlo sample
-    #     Y <- X + tau_w[Ik, In] * matrix(rnorm(M * N, 0, 1), nrow = M, ncol = N)
-    #     Y_svd <- svd(Y)
-    #     Sy <- Y_svd$d - lambda[Ik, In, Il]
-    #     Sy[Sy < 0] <- 0
-    #     SVT_Y <- Y_svd$u %*% diag(Sy) %*% t(Y_svd$v)
-    #     
-    #     MCS[Il, In, Ik, Is] <- sum((SVT_Y - X)^2)
-    #     MCR[Il, In, Ik] <- MCR[Il, In, Ik] + MCS[Il, In, Ik, Is]
-    #   }
-    #   MCR[Il, In, Ik] = MCR[Il, In, Ik]/Ns
+     for (Il in 1) { # loop over lambda 1:Nl
+      for (Is in 1) { # Monte Carlo sample 1:Ns
+        Y <- X + tau_w[Ik, In] * matrix(rnorm(M * N, 0, 1), nrow = M, ncol = N)
+        Y_svd <- svd(Y)
+        Sy <- Y_svd$d - lambda[Ik, In, Il]
+        Sy[Sy < 0] <- 0
+        SVT_Y <- Y_svd$u %*% diag(Sy) %*% t(Y_svd$v)
+
+        MCS[Il, In, Ik, Is] <- sum((SVT_Y - X)^2)
+        MCR[Il, In, Ik] <- MCR[Il, In, Ik] + MCS[Il, In, Ik, Is]
+      }
+      MCR[Il, In, Ik] = MCR[Il, In, Ik]/Ns
        Y <- X + tau_w[Ik, In] * matrix(rnorm(M * N, 0, 1), nrow = M, ncol = N)
        SURE[Il, In, Ik] <- sure_svt(lambda[Ik, In, Il], tau_w[Ik, In], Y)
     }
@@ -71,3 +71,20 @@ for (In in 1) {
   }
 }
 
+# synthesize some fake examples to understand the behavior
+
+truth <- matrix(c(rep(1:10, 10)), nrow = 10)
+set.seed(100)
+noises <- matrix(rnorm(100, mean = 0, sd = 0.01), nrow = 10)
+added_noise <- truth + noises
+MSE <- sum((added_noise - truth)^2)
+added_noise_svd <- rsvd::rsvd(added_noise, k = 10, q = 2)
+tau <- 0.01
+lambda <- seq(0, 10 * tau, length.out = 50)
+SURE <- purrr::map_dbl(lambda, ~sure_svt(.x, tau, added_noise, s = added_noise_svd$d))
+plot(lambda, SURE)
+
+res <- added_noise_svd$u %*% diag(scDNAmClock::soft_threshold(added_noise_svd$d, lambda[which.min(SURE)])) %*% t(added_noise_svd$v)
+sum((res - truth)^2) # 0.004
+
+# when tau is set to the correct value, the noise reduction is optimal

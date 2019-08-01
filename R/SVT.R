@@ -51,17 +51,18 @@ sure_div_svt <- function(lambda, s, is_real, M, N, svThreshold) {
 
 
 div_svt_real <- function(lambda, s, idx_p, M, N) {
+  # browser()
   x <- 0
   if(any(idx_p)) {
     x <- x + sum(0.5 * s[idx_p, 2] * (s[idx_p, 2] + 1))
-    x <- x + sum((abs(M - N) * s[idx_p, 2] + 0.5 * s[idx_p, 2] * (s[idx_p, 2] - 1)) * (pmax(0, s[idx_p, 1] - lambda) / s[idx_p, 1]))
+    x <- x + sum((abs(M - N) * s[idx_p, 2] + 0.5 * s[idx_p, 2] * (s[idx_p, 2] + 1)) * (pmax(0, s[idx_p, 1] - lambda) / s[idx_p, 1]))
   }
   D <- matrix(0, nrow(s), nrow(s))
   for (Ik in 1:nrow(s)) {
     D[, Ik] <- s[Ik, 2] * s[, 2] * s[, 1] * pmax(0, s[, 1] - lambda)/(s[, 1]^2 - s[Ik, 1]^2)
   }
-  D[ is.na(D) | is.infinite(D) | abs(D) > 1e6 ] <- 0
-  x <- x + 2 * sum(D)
+  D[ is.infinite(D) ] <- 0
+  x <- x + 2 * sum(D, na.rm = T)
   return(x)
 }
 
