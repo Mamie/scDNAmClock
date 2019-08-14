@@ -75,3 +75,11 @@ join_meth_list <- function(meth_list, all.x = FALSE, all.y = FALSE) {
   }
   return(joined)
 }
+
+truncate_outlier <- function(x, a = 3) {
+  iqr <- IQR(x)
+  median <- median(x)
+  x[x > median + a * iqr] <- median + a * iqr
+  x[x < median - a * iqr] <- median - a * iqr
+  x
+}

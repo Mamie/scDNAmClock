@@ -3,6 +3,7 @@ library(scDNAmClock)
 library(survival)
 library(tidyverse)
 library(tidymodels)
+library(hqreg)
 
 # retraining the PhenoAge model with TSVD values
 load("data-raw/NewPhenoAge_SVD.RData")
@@ -10,19 +11,18 @@ load("data-raw/NewPhenoAge_SVD.RData")
 # examine the original dataset
 set.seed(120)
 # cross validation to select the best lambda
-CV = cv.glmnet(datMeth_InCHIANTI,Pheno_InCHIANTI$PredAge, nfolds=10, alpha=0.5, family="gaussian")
+CV = cv.glmnet(datMeth_InCHIANTI, Pheno_InCHIANTI$PredAge, nfolds=10, alpha=0.5, family="gaussian")
+plot(CV)
 CV_coef <- scDNAmClock:::tidy_coef(CV, s = CV$lambda.min, coef_names = c("intercept", colnames(datMeth_InCHIANTI))) 
 
-fit = glmnet(datMeth_InCHIANTI, Pheno_InCHIANTI$PredAge, family="gaussian", alpha=0.5, nlambda=100)
-
 # original performance 
-DNAmPhenoAge_Train <- as.numeric(predict(fit, datMeth_InCHIANTI, type="response", s=CV$lambda.min))
+DNAmPhenoAge_Train <- as.numeric(predict(CV, datMeth_InCHIANTI, type="response", s=CV$lambda.min))
 # training error
 metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = DNAmPhenoAge_Train),
         truth, estimate) %>%
   .[,-2] %>%
   kableExtra::kable(., digits = 2) %>%
-  kableExtra::kable_styling()# r squared, root mean squared, mean absolute error
+  kableExtra::kable_styling() # r squared, root mean squared, mean absolute error
 # .metric .estimator .estimate
 # <chr>   <chr>          <dbl>
 # 1 rmse    standard       3.07 
@@ -30,73 +30,143 @@ metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = DNAmPhenoAge_Trai
 # 3 mae     standard       2.34
 
 DNAmPhenoAge_Test <- as.numeric(predict(fit, datMeth_WHI, type="response", s=CV$lambda.min))
-head(DNAmPhenoAge_Test)
-head(Pheno_WHI$DNAmPhenoAge)
+WHI_cox <- coxph(Surv(ENDFOLLOWALLDY, DEATHALL) ~ DNAmPhenoAge_Test + agewhi, data = Pheno_WHI)
+summary(WHI_cox)
 
-# correlation of age with predicted PhenoAge
-WGCNA::verboseScatterplot(Pheno_WHI$agewhi,DNAmPhenoAge_Test,xlab="Age",ylab="New DNAmPhenoAge",main="Validation Set")
-abline(0,1,col="red") # correlation of predicted phenoage with actual age in test set: 0.66 
-WGCNA::verboseScatterplot(Pheno_WHI$agewhi,Pheno_WHI$DNAmPhenoAge,xlab="Age",ylab="Original DNAmPhenoAge",main="Validation Set") # ? not the original DNAmPhenoAge
-abline(0,1,col="red")
+library(hqreg)
+CV_robust <- cv.hqreg(datMeth_InCHIANTI, Pheno_InCHIANTI$PredAge, method = "huber", nfolds=10, alpha=0.5, seed = 120, lambda.min = 0.01)
+plot(CV_robust)
+CV_coef <- coef(CV_robust, lambda = "lambda.1se") %>%
+  as.matrix() %>%
+  data.frame() %>%
+  tibble::rownames_to_column() %>%  
+  setNames(c("term","estimate")) %>%
+  filter(estimate != 0)
 
-# perform SVD
-set.seed(120)
-InCHIANTI_SVD <- rsvd::rsvd(datMeth_InCHIANTI, k = min(dim(datMeth_InCHIANTI)))
-set.seed(120)
-WHI_SVD <- rsvd::rsvd(datMeth_WHII, k = min(dim(datMeth_WHI)))
-InCHIANTI_SVD <- readRDS("data-raw/InCHIANTI_SVD.rds")
-WHI_SVD <- readRDS("data-raw/WHI_SVD.rds")
+DNAmPhenoAge_Train <- as.numeric(predict(CV_robust, datMeth_InCHIANTI, lambda = "lambda.1se"))
+# training error
+metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = DNAmPhenoAge_Train),
+        truth, estimate) %>%
+  .[,-2] %>%
+  kableExtra::kable(., digits = 2) %>%
+  kableExtra::kable_styling()
+
+DNAmPhenoAge_Test <- as.numeric(predict(CV_robust, datMeth_WHI, lambda = "lambda.min"))
+
+WHI_cox <- coxph(Surv(ENDFOLLOWALLDY, DEATHALL) ~ DNAmPhenoAge_Test + agewhi, data = Pheno_WHI)
+summary(WHI_cox)
+
+
+
+
+# perform SVD (transform data)
+
+# InCHIANTI_M <- apply(datMeth_InCHIANTI, 2, function(x) asinh(log2(x/(1-x))))
+# InCHIANTI_M <- t(apply(InCHIANTI_M, 1, function(x) truncate_outlier(x, a = 3)))
+# 
+# WHI_M <- apply(datMeth_WHI, 2, function(x) asinh(log2(x/(1-x))))
+# WHI_M <- t(apply(WHI_M, 1, function(x) truncate_outlier(x, a = 3)))
+# 
+# # the following code was ran on HPC
+# set.seed(120)
+# InCHIANTI_SVD <- rsvd::rsvd(InCHIANTI_M, k = min(dim(InCHIANTI_M)))
+# set.seed(120)
+# WHI_SVD <- rsvd::rsvd(WHI_M, k = min(dim(WHI_M)))
+InCHIANTI_M_asinh <- readRDS("data-raw/InCHIANTI_M_asinh.rds")
+InCHIANTI_SVD <- readRDS("data-raw/InCHIANTI_M_SVD.rds")
+WHI_M_asinh <- readRDS("data-raw/WHI_M_asinh.rds")
+WHI_SVD <- readRDS("data-raw/WHI_M_SVD.rds")
+
+# find a way to estimate the noise level
 
 # select the lambda shrinkage parameter using the SURE
-tau <- 0.013
-lambda <- seq(0, tau * 200, length.out = 100)
-InCHIANTI_SURE <- c()
-WHI_SURE <- c()
-for (l in lambda) {
-  InCHIANTI_SURE <- c(InCHIANTI_SURE, sure_svt(l, tau, datMeth_InCHIANTI, s = InCHIANTI_SVD$d, is_real = T, svThreshold = 1e-8))
+tau <- 0.104 # use the tau from the replicate analysis
+n_tau <- length(tau)
+n_lambda <- 50
+lambda_max <- 500
+lambda <- matrix(NA, nrow = n_tau, ncol = n_lambda)
+for (i in seq_along(tau)) {
+  lambda[i,] <- seq(0, tau[i] * lambda_max, length.out = n_lambda)
 }
 
-for (l in lambda) {
-  WHI_SURE <- c(WHI_SURE, sure_svt(l, tau, datMeth_WHI, s = WHI_SVD$d, is_real = T, svThreshold = 1e-8))
+InCHIANTI_SURE <- WHI_SURE <- matrix(NA, nrow = n_tau, ncol = n_lambda)
+
+
+for (i in seq(n_tau)) {
+  for (j in seq(n_lambda)) {
+    InCHIANTI_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], InCHIANTI_M_asinh, s = InCHIANTI_SVD$d, is_real = T, svThreshold = 1e-8)
+  }
 }
 
-p1 <- plot_SURE(lambda, InCHIANTI_SURE) + ylab("InCHIANTI SURE")
-p2 <- plot_SURE(lambda, WHI_SURE) + ylab("WHI SURE")
+for (i in seq(n_tau)) {
+  for (j in seq(n_lambda)) {
+    WHI_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], WHI_M_asinh, s = WHI_SVD$d, is_real = T, svThreshold = 1e-8)
+  }
+}
+
+i = 1
+p1 <- plot_SURE(lambda[i,], InCHIANTI_SURE[i,]) + ylab("InCHIANTI SURE") +
+  scale_y_continuous(labels = scDNAmClock:::fancy_scientific)
+p2 <- plot_SURE(lambda[i,], WHI_SURE[i,]) + ylab("WHI SURE") +
+  scale_y_continuous(labels = scDNAmClock:::fancy_scientific)
 p <- cowplot::plot_grid(p1, p2, nrow = 2, align = "h")
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/InCHIANTI_WHI_lambda.png", width = 2, height = 4)
-InCHINATI_SVT <- SVT_denoise(datMeth_InCHIANTI, 
-                             lambda = lambda[which.min(InCHIANTI_SURE)],
+InCHIANTI_SVT <- SVT_denoise(InCHIANTI_M_asinh, 
+                             lambda = lambda[i, which.min(InCHIANTI_SURE[i,])],
                              svd = InCHIANTI_SVD)
-PhenoAge_InCHIANTI <- scDNAmClock::PhenoAge(t(datMeth_InCHIANTI))$y
-PhenoAge_InCHIANTI_SVT <- scDNAmClock::PhenoAge(t(InCHINATI_SVT))$y
+InCHIANTI_beta <- apply(InCHIANTI_SVT, 2, function(x) 2^sinh(x)/(1 + 2^sinh(x)))
 
-metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = PhenoAge_InCHIANTI),
+CV_robust <- cv.hqreg(InCHIANTI_beta, Pheno_InCHIANTI$PredAge, method = "huber", nfolds=10, alpha=0.5, 
+                      lambda.min = 0.01, seed = 120)
+plot(CV_robust)
+CV_coef <- coef(CV_robust, lambda = "lambda.1se") %>%
+  as.matrix() %>%
+  data.frame() %>%
+  tibble::rownames_to_column() %>%  
+  setNames(c("term","estimate")) %>%
+  filter(estimate != 0)
+
+DNAmPhenoAge_Train <- as.numeric(predict(CV_robust, InCHIANTI_beta, lambda = "lambda.1se"))
+# training error
+metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = DNAmPhenoAge_Train),
         truth, estimate) %>%
   .[,-2] %>%
   kableExtra::kable(., digits = 2) %>%
   kableExtra::kable_styling()
-metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = PhenoAge_InCHIANTI_SVT),
-        truth, estimate) %>%
-  .[,-2] %>%
-  kableExtra::kable(., digits = 2) %>%
-  kableExtra::kable_styling()
+
+# PhenoAge_InCHIANTI <- scDNAmClock::PhenoAge(t(datMeth_InCHIANTI))$y
+# PhenoAge_InCHIANTI_SVT <- scDNAmClock::PhenoAge(t(InCHIANTI_beta))$y
+# 
+# metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = PhenoAge_InCHIANTI),
+#         truth, estimate) %>%
+#   .[,-2] %>%
+#   kableExtra::kable(., digits = 2) %>%
+#   kableExtra::kable_styling()
+# metrics(data.frame(truth = Pheno_InCHIANTI$PredAge, estimate = PhenoAge_InCHIANTI_SVT),
+#         truth, estimate) %>%
+#   .[,-2] %>%
+#   kableExtra::kable(., digits = 2) %>%
+#   kableExtra::kable_styling()
 
 
-p <- ggplot(data = data.frame(orig = PhenoAge_InCHIANTI, SVT = PhenoAge_InCHIANTI_SVT)) +
-  geom_point(aes(x = orig, y = SVT), size = 0.1, alpha = 0.2) +
-  theme_bw() +
-  geom_abline() +
-  xlab("PhenoAge") +
-  ylab("PhenoAge SVT") +
-  theme(panel.grid = element_blank())
-ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/InCHIANTI_SVT_orig.png", width = 3, height = 3)
+# p <- ggplot(data = data.frame(orig = PhenoAge_InCHIANTI, SVT = PhenoAge_InCHIANTI_SVT)) +
+#   geom_point(aes(x = orig, y = SVT), size = 0.1, alpha = 0.2) +
+#   theme_bw() +
+#   geom_abline() +
+#   xlab("PhenoAge") +
+#   ylab("PhenoAge SVT") +
+#   theme(panel.grid = element_blank())
+# ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/InCHIANTI_SVT_orig.png", width = 3, height = 3)
 
 
-WHI_SVT <- SVT_denoise(datMeth_WHI, 
-                       lambda = lambda[which.min(WHI_SURE)],
+WHI_SVT <- SVT_denoise(WHI_M_asinh, 
+                       lambda = lambda[i,which.min(WHI_SURE[i,])],
                        svd = WHI_SVD)
+WHI_beta <- apply(WHI_SVT, 2, function(x) 2^sinh(x)/(1 + 2^sinh(x)))
+
+PhenoAge_WHI_SVT <- as.numeric(predict(CV_robust, WHI_beta, lambda = "lambda.1se"))
 PhenoAge_WHI <- scDNAmClock::PhenoAge(t(datMeth_WHI))$y
-PhenoAge_WHI_SVT <- scDNAmClock::PhenoAge(t(WHI_SVT))$y
+PhenoAge_WHI_SVT <- scDNAmClock::PhenoAge(t(WHI_beta))$y
 
 
 p <- ggplot(data = data.frame(orig = PhenoAge_WHI, SVT = PhenoAge_WHI_SVT)) +
@@ -129,9 +199,6 @@ p <- coefs %>%
   geom_hline(aes(yintercept = 1), linetype = "dashed")
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/WHI_cox_SVT.png", width = 4, height = 3)
 
-  
-  
-  
   
 set.seed(120)
 CV_SVD = cv.glmnet(InCHINATI_SVT, Pheno_InCHIANTI$PredAge, nfolds=10, alpha=0, family="gaussian")

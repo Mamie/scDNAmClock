@@ -3,14 +3,9 @@
 #' @inheritParams rsvd::rsvd
 #' @return A matrix of denoised data
 #' @export
-SVT_denoise <- function(A, lambda, svd = NULL) {
-  if (is.null(svd)) {
-    svd <- rsvd::rsvd(A, k = min(dim(A)), q = 2)
-  }
+SVT_denoise <- function(lambda, svd) {
   d <- soft_threshold(svd$d, lambda)
   reconstructed <- svd$u %*% diag(d) %*% t(svd$v)
-  colnames(reconstructed) <- colnames(A)
-  rownames(reconstructed) <- rownames(A)
   return(reconstructed)
 }
 

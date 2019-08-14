@@ -4,17 +4,22 @@ library(dendextend)
 
 # reproducing the problem using technical replicates
 samples <- readr::read_csv("data-raw/technical_rep_sample_lists.csv")
-data <- readr::read_tsv("data-raw/tech_rep_data.tsv")
+data <- readr::read_tsv("data-raw/tech_rep_data.tsv") 
 colnames(data) <- c("probe", samples$name)
-mapped <- data %>%
-  tidyr::drop_na() %>%
+data_M <- data
+data_M[,-1] <- apply(data_M[,-1], 2, function(x) log2(x / (1 - x)))
+
+# impute the M values
+data_M[,-1] <- impute::impute.knn(as.matrix(data_M[,-1]))$data
+range(unlist(data_M[,-1]))
+
+mapped <- data_M %>%
   tidyr::gather(pid, beta, -probe) %>%
   left_join(samples[, -2], by = c("pid" = "name")) %>%
   select(-pid) %>%
   tidyr::spread(group, beta)
 colnames(mapped)[5:6] <- c("replicate 1", "replicate 2")
-readr::write_csv(mapped, path = "data-raw/tech_rep_data_annotated.csv")
-
+#readr::write_csv(mapped, path = "data-raw/tech_rep_data_annotated.csv")
 
 probes_data <- split(mapped, mapped$probe)
 
@@ -41,11 +46,14 @@ mapped$icc_truncated[mapped$icc_truncated < 0] <- 0
 
 # scatterplot of the 513 sites
 p <- ggplot(data = mapped %>% rename(ICC = icc_truncated)) +
-  geom_point(aes(x = `replicate 1`, y = `replicate 2`, color = ICC), size = 0.1, alpha = 0.1) +
+  geom_point(aes(x = `replicate 1`, y = `replicate 2`, color = ICC), size = 0.1, alpha = 0.4) +
   theme_bw() +
   theme(panel.grid = element_blank(),
         legend.position = c(0.8, 0.3)) +
-  scale_color_viridis_c() 
+  scale_color_viridis_c() +
+  coord_fixed(ratio = 1) +
+  xlab("replicate 1 M value") +
+  ylab("replicate 2 M value")
 ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/abs_cor.png", width = 4, height = 4)
 
 # low consistency probes
