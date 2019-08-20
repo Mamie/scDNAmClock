@@ -4,7 +4,7 @@ library(dplyr)
 library(ggplot2)
 
 samples <- readr::read_csv("data-raw/technical_rep_sample_lists.csv")
-M_data <- readRDS("data-raw/Lehne2015_M_Levine_1000_random.rds")
+M_data <- readRDS("data-raw/Lehne2015_M_raw.rds")
 all_data <- M_data
 all_data[,-1] <- apply(all_data[,-1], 2, function(x) 2^(x)/(2^x + 1))
 data <- all_data[, c("ID_REF", samples$name)]
@@ -230,7 +230,9 @@ rownames(rep_data) <- M_data$ID_REF
 set.seed(1)
 # replicate_1_svd <- rsvd::rsvd(rep_1_data, k = min(dim(rep_1_data)), q = 2)
 # replicate_2_svd <- rsvd::rsvd(rep_2_data, k = min(dim(rep_2_data)), q = 2)
-rep_svd <- rsvd::rsvd(rep_data, k = min(dim(rep_data)), q = 2)
+# rep_svd <- rsvd::rsvd(rep_data, k = min(dim(rep_data)), q = 2)
+
+rep_svd <- readRDS("data-raw/Lehne2015_M_svd.rds")
 
 # estimate the noise standard deviation 
 noises <- rep_data[,replicate_1_names] - rep_data[,replicate_2_names]
@@ -249,10 +251,10 @@ dim(noises) <- NULL
 # ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/heteroscedasticity.png", width = 5, height = 4)
 
 library(MASS)
-t_fit <- fitdistr(unlist(noises), "t", start = list(m = mean(unlist(noises)), s = sd(unlist(noises)), df = 39))
+#t_fit <- fitdistr(unlist(noises), "t", start = list(m = mean(unlist(noises)), s = sd(unlist(noises)), df = 39))
 normal_fit <- fitdistr(unlist(noises), "normal") # normal_fit
 
- p <- ggplot(data = data.frame(noise = unlist(noises)), aes(x = noise)) +
+p <- ggplot(data = data.frame(noise = unlist(noises)), aes(x = noise)) +
    geom_histogram(bins = 120, aes(y=..density..), fill = "steelblue") +
    theme_classic() +
    theme(panel.grid = element_blank()) +
@@ -262,7 +264,7 @@ normal_fit <- fitdistr(unlist(noises), "normal") # normal_fit
 # ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/density.png", width = 5, height = 4)
 
 n_lambda <- 50
-lambda_max <- 100
+lambda_max <- 500
 tau <- normal_fit$estimate[2]
 n_tau <- length(tau)
 lambda <- matrix(NA, nrow = n_tau, ncol = n_lambda)
@@ -288,7 +290,7 @@ rep_SURE <- matrix(NA, nrow = n_tau, ncol = n_lambda)
 
 for (i in seq(n_tau)) {
   for (j in seq(n_lambda)) {
-    rep_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], rep_data, s = rep_svd$d, is_real = T, svThreshold = 1e-8)
+    rep_SURE[i, j] <- sure_svt(lambda[i,j], tau[i], SVD = rep_svd, is_real = T, svThreshold = 1e-8)
   }
 }
 
@@ -303,12 +305,14 @@ ggsave(p, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_
 # reconstructed_2 <- SVT_denoise(rep_2_data, lambda = lambda[which.min(rep2_SURE)], svd = replicate_2_svd)
 # truncated_reconstructed <- as.data.frame(cbind(reconstructed_1[, replicate_1_names], 
 #                                                reconstructed_2[, replicate_2_names]))
-reconstructed <- SVT_denoise(rep_data, lambda = lambda[which.min(rep_SURE)], svd = rep_svd)
+reconstructed <- SVT_denoise(lambda = lambda[which.min(rep_SURE)], svd = rep_svd)
+colnames(reconstructed) <- colnames(M_data)[-1]
 #reconstructed <- apply(reconstructed, 2, function(x) truncate_outlier(x, a = 1.5))
 truncated_reconstructed <- as.data.frame(cbind(reconstructed[, replicate_1_names], reconstructed[, replicate_2_names]))
-truncated_reconstructed$probe <- all_data$ID_REF
+truncated_reconstructed$probe <- M_data$ID_REF
 truncated_reconstructed_mat <- apply(truncated_reconstructed[,-ncol(truncated_reconstructed)], 2, function(x) 2^sinh(x)/(1 + 2^sinh(x)))
 rownames(truncated_reconstructed_mat) <- all_data$ID_REF
+
 pheno_age_2 <- scDNAmClock::PhenoAge(truncated_reconstructed_mat)
 plot_data_2 <- data.frame(name = names(pheno_age_2$y), 
                         pheno_age = unname(pheno_age_2$y)) %>%
@@ -352,6 +356,7 @@ p <- ggplot(data = combined_data) +
   scale_fill_manual(name = "", values = cols)
   
 ggsave(p, file = paste0("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/phenoage_hist_2.pdf"), width = 4, height = 3)
+
 dat <- combined_data %>%
   tibble::rownames_to_column() %>%
   select(rowname, SVD_diff, diff) %>%
@@ -370,7 +375,7 @@ p <- ggplot(data = dat, aes(x = method, y = value, color = method)) +
         plot.title = element_text(hjust = 0.5),
         legend.position = c(0.8, 0.8)) +
   ylab("Absolute replicate PhenoAge difference") +
-  ggtitle("Paired t-test: t = -4.73, df = 35, p = 3.6e-5") +
+  ggtitle("Paired t-test: t = -5.90, df = 35, p = 1.04e-6") +
   scale_color_manual(values = c("gray", "steelblue"))
 ggsave(p, file = paste0("~/Dropbox/600 Presentations/Yale projects/low_intensity_probe_correction/figs/phenoage_boxplot_2.pdf"), width = 4, height = 3)
 
@@ -562,8 +567,8 @@ ggsave(p1, file = "~/Dropbox/600 Presentations/Yale projects/low_intensity_probe
 
 
 # replicate data visualization
-original_dat <- all_data[,c(replicate_1_names,replicate_2_names)]
-SVT_dat <- truncated_reconstructed_mat[,c(replicate_1_names,replicate_2_names)]
+original_dat <- all_data[all_data$ID_REF %in% scDNAmClock:::pheno_age_dat$CpG,c(replicate_1_names,replicate_2_names)]
+SVT_dat <- truncated_reconstructed_mat[all_data$ID_REF %in% scDNAmClock:::pheno_age_dat$CpG,c(replicate_1_names,replicate_2_names)]
 labels <- c(seq(36), seq(36))
 SVT_normed <- t(apply(SVT_dat, 1, scale))
 normed <- t(apply(original_dat, 1, scale))
